@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import llamaSvg from '@/assets/llama-svgrepo-com.svg'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events.readonly'
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 
 interface CalendarEvent {
