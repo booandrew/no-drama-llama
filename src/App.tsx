@@ -23,23 +23,33 @@ function App() {
   const accessTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
+    console.log('[GIS] Initializing... CLIENT_ID:', CLIENT_ID ? `${CLIENT_ID.slice(0, 20)}...` : 'MISSING')
+    console.log('[GIS] Current origin:', window.location.origin)
+
     const interval = setInterval(() => {
       if (window.google?.accounts?.oauth2) {
         clearInterval(interval)
+        console.log('[GIS] google.accounts.oauth2 loaded, creating token client')
         tokenClientRef.current = google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID,
           scope: SCOPES,
           callback: (response) => {
+            console.log('[GIS] callback fired, keys:', Object.keys(response))
             if (response.error) {
-              console.error('[GIS] Token error:', response)
+              console.error('[GIS] Token error:', response.error, response)
               setStatus('error')
               return
             }
             accessTokenRef.current = response.access_token
-            console.log('[GIS] Got access token')
+            console.log('[GIS] Got access token, length:', response.access_token?.length)
             fetchEvents(response.access_token)
           },
+          error_callback: (error) => {
+            console.error('[GIS] Error callback:', JSON.stringify(error))
+            setStatus('error')
+          },
         })
+        console.log('[GIS] Token client created successfully')
       }
     }, 100)
     return () => clearInterval(interval)
@@ -87,11 +97,14 @@ function App() {
   }, [])
 
   const handleConnect = () => {
+    console.log('[GIS] handleConnect called, tokenClient exists:', !!tokenClientRef.current)
     if (!tokenClientRef.current) {
       console.error('[GIS] Token client not initialized yet')
       return
     }
+    console.log('[GIS] Calling requestAccessToken...')
     tokenClientRef.current.requestAccessToken()
+    console.log('[GIS] requestAccessToken called (popup should appear)')
   }
 
   return (
