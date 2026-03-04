@@ -63,15 +63,15 @@ NoDramaLLama exists so you never have to solve these problems manually again.
 
 **What's decided:**
 
-| Layer | Description |
-|-------|-------------|
-| **Frontend** | React 19 + TypeScript, Vite, shadcn/ui (New York), Tailwind CSS v4 |
-| **Connectors** | Pluggable adapters that pull raw events from external sources |
-| **AI layer** | LLM-powered chat for mapping and normalization (Anthropic via LiteLLM) |
-| **Target format** | Jira issue key + date + hours (Tempo Timesheets worklog) |
-| **Desired log** | The "ideal" time entries generated from raw activities + AI |
-| **Actual log** | What's currently in Tempo for the selected period |
-| **Diff engine** | Compares desired vs. actual, surfaces additions/changes/deletions |
+| Layer             | Description                                                            |
+| ----------------- | ---------------------------------------------------------------------- |
+| **Frontend**      | React 19 + TypeScript, Vite, shadcn/ui (New York), Tailwind CSS v4     |
+| **Connectors**    | Pluggable adapters that pull raw events from external sources          |
+| **AI layer**      | LLM-powered chat for mapping and normalization (Anthropic via LiteLLM) |
+| **Target format** | Jira issue key + date + hours (Tempo Timesheets worklog)               |
+| **Desired log**   | The "ideal" time entries generated from raw activities + AI            |
+| **Actual log**    | What's currently in Tempo for the selected period                      |
+| **Diff engine**   | Compares desired vs. actual, surfaces additions/changes/deletions      |
 
 ---
 
@@ -79,12 +79,12 @@ NoDramaLLama exists so you never have to solve these problems manually again.
 
 > **Open question:** Screen breakdown is conceptual and subject to change.
 
-| Screen | Purpose |
-|--------|---------|
-| **Settings / Connectors** | Configure API tokens (Jira, Calendar, AI), manage connector settings |
-| **Month View** | Select a time period, see imported raw activities, overview of logged hours |
-| **AI Chat Editor** | Conversational interface to resolve mapping conflicts, split time, ask questions |
-| **Diff & Sync** | Side-by-side comparison of desired vs. actual entries; approve and push to Tempo |
+| Screen                    | Purpose                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| **Settings / Connectors** | Configure API tokens (Jira, Calendar, AI), manage connector settings             |
+| **Month View**            | Select a time period, see imported raw activities, overview of logged hours      |
+| **AI Chat Editor**        | Conversational interface to resolve mapping conflicts, split time, ask questions |
+| **Diff & Sync**           | Side-by-side comparison of desired vs. actual entries; approve and push to Tempo |
 
 ---
 
@@ -106,11 +106,11 @@ pnpm dev
 
 ### Available scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start Vite dev server with HMR |
-| `pnpm build` | Type-check + production build |
-| `pnpm lint` | Run ESLint |
+| Command        | Description                      |
+| -------------- | -------------------------------- |
+| `pnpm dev`     | Start Vite dev server with HMR   |
+| `pnpm build`   | Type-check + production build    |
+| `pnpm lint`    | Run ESLint                       |
 | `pnpm preview` | Preview production build locally |
 
 ### Environment variables
@@ -127,13 +127,13 @@ pnpm dev
 
 ### Planned
 
-| Connector | Source | Status |
-|-----------|--------|--------|
-| **Google Calendar** | Calendar events (meetings, blocks) | Planned |
-| **Jira / Tempo** | Issues, existing worklogs | Planned |
-| **Git** | Commit history per repo | Planned |
-| **Quick Input** | Manual text entry ("2h on PROJECT-123") | Planned |
-| **Trello** | Cards and activity | Under consideration |
+| Connector           | Source                                  | Status              |
+| ------------------- | --------------------------------------- | ------------------- |
+| **Google Calendar** | Calendar events (meetings, blocks)      | Planned             |
+| **Jira / Tempo**    | Issues, existing worklogs               | Planned             |
+| **Git**             | Commit history per repo                 | Planned             |
+| **Quick Input**     | Manual text entry ("2h on PROJECT-123") | Planned             |
+| **Trello**          | Cards and activity                      | Under consideration |
 
 ---
 
@@ -195,17 +195,17 @@ Contributions welcome! This project is in early stages — check the [open quest
 
 ## Tech stack
 
-| Technology | Role |
-|------------|------|
-| React 19 | UI framework |
-| TypeScript 5.9 | Type safety |
-| Vite 7 | Build tool & dev server |
-| Tailwind CSS v4 | Styling |
-| shadcn/ui (New York) | Component library |
+| Technology            | Role                       |
+| --------------------- | -------------------------- |
+| React 19              | UI framework               |
+| TypeScript 5.9        | Type safety                |
+| Vite 7                | Build tool & dev server    |
+| Tailwind CSS v4       | Styling                    |
+| shadcn/ui (New York)  | Component library          |
 | React Hook Form + Zod | Form handling & validation |
-| Recharts | Data visualization |
-| Lucide React | Icons |
-| pnpm | Package manager |
+| Recharts              | Data visualization         |
+| Lucide React          | Icons                      |
+| pnpm                  | Package manager            |
 
 ---
 
