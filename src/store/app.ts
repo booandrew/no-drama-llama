@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Tab = 'paca-time' | 'wool-insights' | 'logs-history'
+type Tab = 'llama-time' | 'wool-insights' | 'logs-history'
 
 interface Integration {
   id: string
@@ -21,7 +21,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set) => ({
-  activeTab: 'paca-time',
+  activeTab: 'llama-time',
   setActiveTab: (activeTab) => set({ activeTab }),
   integrations: defaultIntegrations,
   toggleIntegration: (id) =>

@@ -1,5 +1,5 @@
 import { AppHeader } from '@/components/AppHeader'
-import { PacaTimeTab } from '@/components/PacaTimeTab'
+import { LlamaTimeTab } from '@/components/LlamaTimeTab'
 import { useAppStore } from '@/store/app'
 
 function App() {
@@ -10,7 +10,7 @@ function App() {
     <div className="flex min-h-svh flex-col">
       <AppHeader />
       <main className="flex-1 p-6">
-        {activeTab === 'paca-time' && <PacaTimeTab />}
+        {activeTab === 'llama-time' && <LlamaTimeTab />}
         {activeTab === 'wool-insights' && (
           <div className="text-muted-foreground text-sm">Wool Insights content</div>
         )}
