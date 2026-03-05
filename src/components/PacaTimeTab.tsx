@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
-import { GanttChart } from '@/components/GanttChart'
+import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -17,14 +17,7 @@ import { useCalendarStore } from '@/store/calendar'
 
 type ZoomScale = '1w' | '2w' | '1m'
 
-const FIXED_DAY_WIDTH: Record<ZoomScale, number | null> = {
-  '1w': 140,
-  '2w': 70,
-  '1m': null, // auto-fill container
-}
-
-const MIN_DAY_WIDTH = 32
-const GANTT_MARGIN_LR = 180 + 20 // MARGIN.left + MARGIN.right from GanttChart
+const MINUTES_PER_DAY = 1440
 
 const MONTH_NAMES = [
   'January',
@@ -73,20 +66,21 @@ export function PacaTimeTab() {
   const status = useCalendarStore((s) => s.status)
 
   const [zoom, setZoom] = useState<ZoomScale>('1m')
-  const [containerWidth, setContainerWidth] = useState(0)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const el = wrapperRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentBoxSize[0].inlineSize))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+  const [windowOffset, setWindowOffset] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
-  const fixedWidth = FIXED_DAY_WIDTH[zoom]
-  const dayWidth = fixedWidth ?? Math.max(MIN_DAY_WIDTH, (containerWidth - GANTT_MARGIN_LR) / daysInMonth)
+  const totalMinutes = daysInMonth * MINUTES_PER_DAY
+
+  const zoomDays: Record<ZoomScale, number> = { '1w': 7, '2w': 14, '1m': daysInMonth }
+  const windowDays = zoomDays[zoom]
+  const maxOffset = Math.max(
+    0,
+    Math.ceil((daysInMonth - windowDays) / (zoom === '1w' ? 7 : 14)),
+  )
+
+  const domainStart = windowOffset * (zoom === '1w' ? 7 : 14) * MINUTES_PER_DAY
+  const domainEnd = Math.min(domainStart + windowDays * MINUTES_PER_DAY, totalMinutes)
+  const domain: [number, number] = [domainStart, domainEnd]
 
   const isConnected = status === 'connected' || status === 'done' || status === 'loading'
   const periodOptions = generatePeriodOptions()
@@ -106,6 +100,13 @@ export function PacaTimeTab() {
     setSelectedPeriod(valueToPeriod(value))
   }
 
+  const handleZoomChange = (v: string) => {
+    if (v) {
+      setZoom(v as ZoomScale)
+      setWindowOffset(0)
+    }
+  }
+
   const handleRefresh = () => {
     fetchEvents()
   }
@@ -119,7 +120,7 @@ export function PacaTimeTab() {
   }
 
   return (
-    <div ref={wrapperRef} className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <Select
           value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
@@ -144,13 +145,34 @@ export function PacaTimeTab() {
           <ToggleGroup
             type="single"
             value={zoom}
-            onValueChange={(v) => v && setZoom(v as ZoomScale)}
+            onValueChange={handleZoomChange}
             size="sm"
           >
             <ToggleGroupItem value="1w">1W</ToggleGroupItem>
             <ToggleGroupItem value="2w">2W</ToggleGroupItem>
             <ToggleGroupItem value="1m">1M</ToggleGroupItem>
           </ToggleGroup>
+
+          {zoom !== '1m' && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWindowOffset((o) => Math.max(0, o - 1))}
+                disabled={windowOffset === 0}
+              >
+                ←
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWindowOffset((o) => Math.min(maxOffset, o + 1))}
+                disabled={windowOffset >= maxOffset}
+              >
+                →
+              </Button>
+            </>
+          )}
 
           <Button variant="default" size="sm" onClick={handleRefresh} disabled={eventsLoading}>
             <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
@@ -168,11 +190,11 @@ export function PacaTimeTab() {
       {events.length > 0 && (
         <Card>
           <CardContent className="overflow-x-auto p-0">
-            <GanttChart
+            <TimelineChart
               events={events}
               year={selectedPeriod.year}
               month={selectedPeriod.month}
-              dayWidth={dayWidth}
+              domain={domain}
             />
           </CardContent>
         </Card>
