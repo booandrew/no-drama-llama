@@ -15,14 +15,21 @@ import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
 import { syncAll } from '@/lib/sync'
 import { useCalendarStore } from '@/store/calendar'
 
-type ZoomScale = '1w' | '2w' | '1m'
-
 const MINUTES_PER_DAY = 1440
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April',
-  'May', 'June', 'July', 'August',
-  'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 function generatePeriodOptions() {
@@ -76,8 +83,6 @@ function MiniTimeline({
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const weeksCount = Math.ceil(daysInMonth / 7)
-
-  const toX = (min: number) => (min / totalMinutes) * MINI_W
 
   const viewW = Math.max(8, visibleFraction * MINI_W)
   const maxViewX = MINI_W - viewW
@@ -146,11 +151,12 @@ function MiniTimeline({
   // Week blocks
   const weekBlocks = useMemo(() => {
     const blocks: { x: number; width: number }[] = []
+    const tm = totalMinutes
     for (let w = 0; w < weeksCount; w++) {
       const weekStartMin = w * 7 * MINUTES_PER_DAY
-      const weekEndMin = Math.min(totalMinutes, (w + 1) * 7 * MINUTES_PER_DAY)
-      const x = toX(weekStartMin) + (w === 0 ? 6 : 2)
-      const x2 = toX(weekEndMin) - (w === weeksCount - 1 ? 6 : 2)
+      const weekEndMin = Math.min(tm, (w + 1) * 7 * MINUTES_PER_DAY)
+      const x = (weekStartMin / tm) * MINI_W + (w === 0 ? 6 : 2)
+      const x2 = (weekEndMin / tm) * MINI_W - (w === weeksCount - 1 ? 6 : 2)
       blocks.push({ x, width: x2 - x })
     }
     return blocks
@@ -184,15 +190,7 @@ function MiniTimeline({
         ))}
 
         {/* 3. Viewport overlay */}
-        <rect
-          x={viewX}
-          y={0}
-          width={viewW}
-          height={MINI_H}
-          fill="#6366f1"
-          opacity={0.15}
-          rx={4}
-        />
+        <rect x={viewX} y={0} width={viewW} height={MINI_H} fill="#6366f1" opacity={0.15} rx={4} />
       </svg>
     </div>
   )
@@ -290,16 +288,15 @@ export function LlamaTimeTab() {
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
 
-  const [zoom, setZoom] = useState<ZoomScale>('1m')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [scrollFraction, setScrollFraction] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
   const totalMinutes = daysInMonth * MINUTES_PER_DAY
 
-  const zoomDays: Record<ZoomScale, number> = { '1w': 7, '2w': 14, '1m': daysInMonth }
-  const visibleFraction = zoomDays[zoom] / daysInMonth
-  const chartWidthPercent = (daysInMonth / zoomDays[zoom]) * 100
+  const [visibleDays, setVisibleDays] = useState(daysInMonth)
+  const visibleFraction = visibleDays / daysInMonth
+  const chartWidthPercent = (daysInMonth / visibleDays) * 100
 
   const taskNames = useMemo(() => {
     const names = new Set<string>()
@@ -311,7 +308,10 @@ export function LlamaTimeTab() {
   const isInitialMount = useRef(true)
 
   useEffect(() => {
-    if (isInitialMount.current) { isInitialMount.current = false; return }
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
     if (isConnected) fetchEvents()
   }, [selectedPeriod.year, selectedPeriod.month])
 
@@ -329,13 +329,44 @@ export function LlamaTimeTab() {
     el.scrollLeft = fraction * maxScroll
   }, [])
 
-  const handleZoomChange = (v: string) => {
-    if (v) {
-      setZoom(v as ZoomScale)
+  const setVisibleDaysClamped = useCallback(
+    (days: number) => {
+      setVisibleDays(Math.max(1, Math.min(daysInMonth, days)))
       setScrollFraction(0)
       if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0
+    },
+    [daysInMonth],
+  )
+
+  // Reset visibleDays when month changes
+  useEffect(() => {
+    setVisibleDays(daysInMonth)
+  }, [daysInMonth])
+
+  // Pinch-to-zoom (trackpad) and Cmd+scroll zoom — adjusts by ±1 day
+  const lastZoomTime = useRef(0)
+
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+
+      const now = Date.now()
+      if (now - lastZoomTime.current < 80) return
+      lastZoomTime.current = now
+
+      setVisibleDays((prev) => {
+        const next = e.deltaY > 0 ? prev + 3 : prev - 3
+        return Math.max(1, Math.min(daysInMonth, next))
+      })
     }
-  }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [daysInMonth])
 
   if (!isConnected) {
     return (
@@ -358,16 +389,27 @@ export function LlamaTimeTab() {
           {/* Card header: zoom switcher (left) + mini-view (right) */}
           <div className="flex items-center justify-end gap-3 px-4 py-2 border-b">
             <div className="flex items-center gap-1">
-              {([['1w', 'Week'], ['2w', 'Bi-Week'], ['1m', 'Month']] as const).map(([value, label]) => (
-                <Button
-                  key={value}
-                  variant={zoom === value ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => handleZoomChange(value)}
-                >
-                  {label}
-                </Button>
-              ))}
+              {(
+                [
+                  [1, 'Day'],
+                  [7, 'Week'],
+                  [14, 'Bi-Week'],
+                  [daysInMonth, 'Month'],
+                ] as [number, string][]
+              ).map(([days, label], i, arr) => {
+                const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
+                const isActive = visibleDays > prevMax && visibleDays <= days
+                return (
+                  <Button
+                    key={label}
+                    variant={isActive ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setVisibleDaysClamped(days)}
+                  >
+                    {label}
+                  </Button>
+                )
+              })}
             </div>
 
             <MiniTimeline
@@ -405,7 +447,12 @@ export function LlamaTimeTab() {
               className="flex-1 overflow-x-auto"
               onScroll={handleChartScroll}
             >
-              <div style={{ minWidth: `${chartWidthPercent}%` }}>
+              <div
+                style={{
+                  minWidth: `${chartWidthPercent}%`,
+                  transition: 'min-width 120ms ease-out',
+                }}
+              >
                 <TimelineChart
                   events={events}
                   year={selectedPeriod.year}
