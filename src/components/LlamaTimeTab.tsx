@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar } from 'lucide-react'
+import { Calendar, Lock } from 'lucide-react'
 
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
@@ -9,8 +9,16 @@ import {
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
+  ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -19,7 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
-import { mockDdsCalendarEvents } from '@/lib/mock-data'
+import { mockDdsCalendarEvents, mockDdsTasks, mockDdsJiraIssues } from '@/lib/mock-data'
+import type { DdsTask, DdsJiraIssue } from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
 import type { CalendarEvent } from '@/store/calendar'
 import { useCalendarStore } from '@/store/calendar'
@@ -206,6 +215,141 @@ function MiniTimeline({
 }
 
 // ---------------------------------------------------------------------------
+// Issue Selector Combobox
+// ---------------------------------------------------------------------------
+function IssueSelector({
+  issues,
+  value,
+  disabled,
+  onSelect,
+  className,
+}: {
+  issues: DdsJiraIssue[]
+  value: string | null
+  disabled?: boolean
+  onSelect: (issueKey: string, issueName: string, projectKey: string) => void
+  className?: string
+}) {
+  // Build { value, label } objects so base-ui can map item → input text
+  const issueOptions = useMemo(
+    () =>
+      issues.map((i) => ({
+        value: i.issue_key,
+        label: `${i.issue_key} ${i.issue_name}`,
+      })),
+    [issues],
+  )
+
+  if (disabled && value) {
+    return (
+      <div
+        className={`flex items-center gap-1 rounded border border-transparent bg-muted/50 px-2 py-1 text-xs text-muted-foreground ${className ?? ''}`}
+      >
+        <Lock className="size-3 shrink-0" />
+        <span className="truncate">{value}</span>
+      </div>
+    )
+  }
+
+  const selected = value ? issueOptions.find((o) => o.value === value) ?? null : null
+
+  return (
+    <Combobox
+      value={selected}
+      onValueChange={(val) => {
+        if (val) {
+          const issue = issues.find((i) => i.issue_key === val.value)
+          if (issue) onSelect(issue.issue_key, issue.issue_name, issue.project_key)
+        }
+      }}
+    >
+      <ComboboxInput
+        placeholder="Select issue..."
+        className={`h-7 w-[140px] shrink-0 text-xs ${className ?? ''}`}
+      />
+      <ComboboxContent>
+        <ComboboxList>
+          <ComboboxEmpty>No results</ComboboxEmpty>
+          {issueOptions.map((opt) => (
+            <ComboboxItem key={opt.value} value={opt}>
+              <span className="font-medium">{opt.value}</span>
+              <span className="truncate text-muted-foreground">
+                {issues.find((i) => i.issue_key === opt.value)?.issue_name}
+              </span>
+            </ComboboxItem>
+          ))}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Task Detail Dialog
+// ---------------------------------------------------------------------------
+function TaskDetailDialog({
+  task,
+  issues,
+  open,
+  onOpenChange,
+  onAssignIssue,
+}: {
+  task: DdsTask | null
+  issues: DdsJiraIssue[]
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onAssignIssue: (taskId: string, issueKey: string, issueName: string, projectKey: string) => void
+}) {
+  if (!task) return null
+
+  const hasIssue = !!task.issue_key
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{task.description || '(no title)'}</DialogTitle>
+          <DialogDescription>
+            {task.start_time
+              ? new Date(task.start_time).toLocaleString()
+              : 'No start time'}{' '}
+            &middot; {task.duration} &middot; Source: {task.source}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Issue</span>
+            {hasIssue ? (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Lock className="size-3.5 text-muted-foreground" />
+                <span className="font-medium">{task.issue_key}</span>
+                <span className="text-muted-foreground">{task.issue_name}</span>
+              </div>
+            ) : (
+              <IssueSelector
+                issues={issues}
+                value={null}
+                onSelect={(key, name, proj) => {
+                  onAssignIssue(task.task_id, key, name, proj)
+                  onOpenChange(false)
+                }}
+                className="w-[220px]"
+              />
+            )}
+          </div>
+          {task.project_key && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Project</span>
+              <span className="text-sm text-muted-foreground">{task.project_key}</span>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // LlamaTimeToolbar — period selector + action buttons (full-width row)
 // ---------------------------------------------------------------------------
 export function LlamaTimeToolbar() {
@@ -272,6 +416,12 @@ function mockEventsForPeriod(year: number, month: number): CalendarEvent[] {
     }))
 }
 
+function mockTasksForPeriod(year: number, month: number): DdsTask[] {
+  const start = new Date(year, month, 1).toISOString()
+  const end = new Date(year, month + 1, 1).toISOString()
+  return mockDdsTasks.filter((t) => t.start_time && t.start_time >= start && t.start_time < end)
+}
+
 export function LlamaTimeTab() {
   const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
@@ -284,6 +434,50 @@ export function LlamaTimeTab() {
     ? mockEventsForPeriod(selectedPeriod.year, selectedPeriod.month)
     : realEvents
 
+  // Tasks data from DDS
+  const [tasks, setTasks] = useState<DdsTask[]>([])
+
+  useEffect(() => {
+    if (isMockMode) {
+      setTasks(mockTasksForPeriod(selectedPeriod.year, selectedPeriod.month))
+    }
+  }, [isMockMode, selectedPeriod.year, selectedPeriod.month])
+
+  // Distinct Jira issues for dropdowns
+  const jiraIssues = useMemo<DdsJiraIssue[]>(() => {
+    if (isMockMode) return mockDdsJiraIssues
+    return []
+  }, [isMockMode])
+
+  // Split tasks into two groups
+  const { assignedTasks, unassignedTasks } = useMemo(() => {
+    const assigned: DdsTask[] = []
+    const unassigned: DdsTask[] = []
+    for (const t of tasks) {
+      if (t.issue_key) assigned.push(t)
+      else unassigned.push(t)
+    }
+    return { assignedTasks: assigned, unassignedTasks: unassigned }
+  }, [tasks])
+
+  // Assign issue to a task
+  const handleAssignIssue = useCallback(
+    (taskId: string, issueKey: string, issueName: string, projectKey: string) => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.task_id === taskId
+            ? { ...t, issue_key: issueKey, issue_name: issueName, project_key: projectKey }
+            : t,
+        ),
+      )
+    },
+    [],
+  )
+
+  // Dialog state
+  const [dialogTask, setDialogTask] = useState<DdsTask | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
   const chartBodyRef = useRef<HTMLDivElement>(null)
   const dayLabelsRef = useRef<HTMLDivElement>(null)
   const taskNamesRef = useRef<HTMLDivElement>(null)
@@ -295,12 +489,6 @@ export function LlamaTimeTab() {
   const [visibleDays, setVisibleDays] = useState(daysInMonth)
   const visibleFraction = visibleDays / daysInMonth
   const chartWidthPercent = (daysInMonth / visibleDays) * 100
-
-  const taskNames = useMemo(() => {
-    const names = new Set<string>()
-    for (const e of events) names.add(e.summary ?? '(no title)')
-    return Array.from(names).sort()
-  }, [events])
 
   const isConnected =
     isMockMode || status === 'connected' || status === 'done' || status === 'loading'
@@ -385,17 +573,18 @@ export function LlamaTimeTab() {
     )
   }
 
-  const chartBodyHeight = Math.max(200, taskNames.length * 44 + 20)
+  const allTasksOrdered = [...assignedTasks, ...unassignedTasks]
+  const chartBodyHeight = Math.max(200, allTasksOrdered.length * 44 + 20)
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-4">
-      {events.length === 0 && !eventsLoading && (
+      {tasks.length === 0 && events.length === 0 && !eventsLoading && (
         <p className="text-muted-foreground text-sm">
           Select a period or click Refresh to load events.
         </p>
       )}
 
-      {events.length > 0 && (
+      {(tasks.length > 0 || events.length > 0) && (
         <Card className="flex flex-1 min-h-0 flex-col">
           {/* Card header: zoom switcher + mini-view */}
           <div className="flex shrink-0 items-center justify-end gap-3 border-b px-4 py-2">
@@ -468,23 +657,69 @@ export function LlamaTimeTab() {
               <div className="flex flex-col" style={{ height: chartBodyHeight }}>
                 <div style={{ height: 10, flexShrink: 0 }} />
                 <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
-                  {taskNames.map((name) => (
+                  {/* Group 1: Assigned tasks */}
+                  {assignedTasks.length > 0 && (
+                    <>
+                      {assignedTasks.map((task) => (
+                        <div
+                          key={task.task_id}
+                          className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2 cursor-pointer hover:bg-muted/50"
+                          title={`${task.description} (${task.issue_key})`}
+                          onClick={() => {
+                            setDialogTask(task)
+                            setDialogOpen(true)
+                          }}
+                        >
+                          <span className="text-sm text-muted-foreground truncate shrink min-w-0">
+                            {(task.description ?? '(no title)').length > 20
+                              ? (task.description ?? '').slice(0, 18) + '...'
+                              : task.description ?? '(no title)'}
+                          </span>
+                          <IssueSelector
+                            issues={jiraIssues}
+                            value={task.issue_key}
+                            disabled
+                            onSelect={() => {}}
+                          />
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {/* Separator between groups */}
+                  {assignedTasks.length > 0 && unassignedTasks.length > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Unassigned
+                      </span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  )}
+                  {/* Group 2: Unassigned tasks */}
+                  {unassignedTasks.map((task) => (
                     <div
-                      key={name}
-                      className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2"
-                      title={name}
+                      key={task.task_id}
+                      className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2 cursor-pointer hover:bg-muted/50"
+                      title={task.description ?? '(no title)'}
+                      onClick={(e) => {
+                        // Don't open dialog when clicking combobox
+                        if ((e.target as HTMLElement).closest('[data-slot="combobox-content"], [data-slot="combobox-trigger"], input')) return
+                        setDialogTask(task)
+                        setDialogOpen(true)
+                      }}
                     >
                       <span className="text-sm text-muted-foreground truncate shrink min-w-0">
-                        {name.length > 20 ? name.slice(0, 18) + '...' : name}
+                        {(task.description ?? '(no title)').length > 20
+                          ? (task.description ?? '').slice(0, 18) + '...'
+                          : task.description ?? '(no title)'}
                       </span>
-                      <Combobox>
-                        <ComboboxInput placeholder="—" className="h-7 w-[140px] shrink-0 text-xs" />
-                        <ComboboxContent>
-                          <ComboboxList>
-                            <ComboboxEmpty>No results</ComboboxEmpty>
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
+                      <IssueSelector
+                        issues={jiraIssues}
+                        value={null}
+                        onSelect={(key, name, proj) =>
+                          handleAssignIssue(task.task_id, key, name, proj)
+                        }
+                      />
                     </div>
                   ))}
                 </div>
@@ -511,6 +746,24 @@ export function LlamaTimeTab() {
           </div>
         </Card>
       )}
+
+      <TaskDetailDialog
+        task={dialogTask}
+        issues={jiraIssues}
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            // Refresh dialogTask from current tasks state
+            if (dialogTask) {
+              const updated = tasks.find((t) => t.task_id === dialogTask.task_id)
+              if (updated) setDialogTask(updated)
+            }
+          }
+        }}
+        onAssignIssue={handleAssignIssue}
+      />
     </div>
   )
 }
+

@@ -217,7 +217,9 @@ for (const day of calWorkingDays) {
     } while (usedHours.has(startHour))
     usedHours.add(startHour)
 
-    const durationMin = [30, 60, 60, 90][Math.floor(rand() * 4)]
+    // 2h to 7h in 30-min steps: [120, 150, 180, ..., 420]
+    const durationSteps = Array.from({ length: 11 }, (_, i) => 120 + i * 30)
+    const durationMin = durationSteps[Math.floor(rand() * durationSteps.length)]
     const endHour = startHour + Math.floor(durationMin / 60)
     const endMin = durationMin % 60
 
@@ -308,54 +310,58 @@ for (const day of [...allDays(2026, 0), ...allDays(2026, 1)]) {
   })
 }
 
-// ── DDS Tasks (from calendar events, with keyword-matched issues) ─────
+// ── DDS Tasks (15 fixed rows: 5 with issue data, 10 without) ─────────
 
-const KEYWORD_ISSUE_MAP: { keywords: string[]; issue: IssueEntry }[] = [
-  { keywords: ['standup', 'sprint'], issue: issues[0] }, // ALPHA-1
-  { keywords: ['code review'], issue: issues[6] }, // ALPHA-7
-  { keywords: ['design'], issue: issues[1] }, // ALPHA-2
-  { keywords: ['architecture'], issue: issues[1] }, // ALPHA-2
-  { keywords: ['demo', 'product'], issue: issues[10] }, // ALPHA-11
-  { keywords: ['dashboard'], issue: issues[12] }, // BETA-1
-  { keywords: ['payment', 'invoice'], issue: issues[22] }, // GAMMA-1
-  { keywords: ['onboarding'], issue: issues[11] }, // ALPHA-12
+const TASK_DESCRIPTIONS = [
+  'Team standup',
+  'Sprint planning',
+  'Code review session',
+  'Design sync',
+  'Architecture discussion',
+  '1:1 with manager',
+  'Product demo',
+  'Retrospective',
+  'Backlog grooming',
+  'Customer call',
+  'Tech debt discussion',
+  'Onboarding session',
+  'Lunch and learn',
+  'Pair programming',
+  'Release planning',
 ]
 
-let taskIdCounter = 90001
+// First 5 tasks have issue data, remaining 10 do not
+const TASK_ISSUES: (IssueEntry | null)[] = [
+  issues[0], // ALPHA-1
+  issues[6], // ALPHA-7
+  issues[1], // ALPHA-2
+  issues[12], // BETA-1
+  issues[22], // GAMMA-1
+  null, null, null, null, null,
+  null, null, null, null, null,
+]
 
-export const mockDdsTasks: DdsTask[] = mockDdsCalendarEvents.map((event) => {
-  const desc = event.summary ?? ''
-  const descLower = desc.toLowerCase()
+// Spread tasks across Jan–Feb working days
+const taskDays = [...workingDays(2026, 0), ...workingDays(2026, 1)]
 
-  let issueKey: string | null = null
-  let issueName: string | null = null
-  let projectKey: string | null = null
-
-  for (const mapping of KEYWORD_ISSUE_MAP) {
-    if (mapping.keywords.some((kw) => descLower.includes(kw))) {
-      issueKey = mapping.issue.key
-      issueName = mapping.issue.summary
-      projectKey = mapping.issue.project_key
-      break
-    }
-  }
-
-  // Calculate duration from start/end
-  const startMs = event.start_time ? new Date(event.start_time).getTime() : 0
-  const endMs = event.end_time ? new Date(event.end_time).getTime() : 0
-  const durationMin = Math.round((endMs - startMs) / 60000)
+export const mockDdsTasks: DdsTask[] = TASK_DESCRIPTIONS.map((desc, i) => {
+  const day = taskDays[i % taskDays.length]
+  const hour = 9 + (i % 8)
+  const durationMin = [60, 90, 120, 60, 90, 30, 60, 120, 60, 90, 60, 30, 60, 120, 90][i]
   const durationStr = durationMin >= 60 ? `${Math.round(durationMin / 60)}h` : `${durationMin}m`
+  const startDT = `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`
+  const issue = TASK_ISSUES[i]
 
   return {
-    task_id: `task_${taskIdCounter++}`,
+    task_id: `task_${90001 + i}`,
     description: desc,
     duration: durationStr,
-    start_time: event.start_time ?? '',
-    issue_key: issueKey,
-    issue_name: issueName,
-    project_key: projectKey,
+    start_time: startDT,
+    issue_key: issue?.key ?? null,
+    issue_name: issue?.summary ?? null,
+    project_key: issue?.project_key ?? null,
     revision: 1,
     source: 'gcal',
-    source_id: event.id,
+    source_id: `cal_${80001 + i}`,
   }
 })

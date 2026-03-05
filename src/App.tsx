@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
@@ -10,8 +10,12 @@ import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { durationToMinutes } from '@/lib/duration'
 import { useDuckDB } from '@/lib/duckdb'
 import { getLatestDataMonth } from '@/lib/duckdb/latest-data-month'
+import { mockDdsTasks } from '@/lib/mock-data'
+import type { DdsTask } from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useCustomInputsStore } from '@/store/custom-inputs'
@@ -84,6 +88,123 @@ function LlamaSidebar() {
   )
 }
 
+function SummaryCard() {
+  const isMockMode = useAppStore((s) => s.isMockMode)
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
+
+  const tasks = useMemo<DdsTask[]>(() => {
+    if (!isMockMode) return []
+    const start = new Date(selectedPeriod.year, selectedPeriod.month, 1).toISOString()
+    const end = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1).toISOString()
+    return mockDdsTasks.filter((t) => t.start_time && t.start_time >= start && t.start_time < end)
+  }, [isMockMode, selectedPeriod.year, selectedPeriod.month])
+
+  const totalMinutes = useMemo(
+    () => tasks.reduce((sum, t) => sum + durationToMinutes(t.duration), 0),
+    [tasks],
+  )
+
+  // Per-project aggregation
+  const projectStats = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of tasks) {
+      const key = t.project_key ?? 'Unassigned'
+      map.set(key, (map.get(key) ?? 0) + durationToMinutes(t.duration))
+    }
+    return Array.from(map.entries())
+      .map(([project, minutes]) => ({
+        project,
+        minutes,
+        pct: totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0,
+      }))
+      .sort((a, b) => b.minutes - a.minutes)
+  }, [tasks, totalMinutes])
+
+  // Per-issue aggregation
+  const issueStats = useMemo(() => {
+    const map = new Map<string, { name: string; minutes: number }>()
+    for (const t of tasks) {
+      const key = t.issue_key ?? 'Unassigned'
+      const existing = map.get(key)
+      if (existing) {
+        existing.minutes += durationToMinutes(t.duration)
+      } else {
+        map.set(key, {
+          name: t.issue_name ?? 'No issue',
+          minutes: durationToMinutes(t.duration),
+        })
+      }
+    }
+    return Array.from(map.entries())
+      .map(([issue, data]) => ({
+        issue,
+        name: data.name,
+        minutes: data.minutes,
+        pct: totalMinutes > 0 ? Math.round((data.minutes / totalMinutes) * 100) : 0,
+      }))
+      .sort((a, b) => b.minutes - a.minutes)
+  }, [tasks, totalMinutes])
+
+  const formatDuration = (min: number) => {
+    const h = Math.floor(min / 60)
+    const m = min % 60
+    return m > 0 ? `${h}h ${m}m` : `${h}h`
+  }
+
+  return (
+    <Card className="flex-1 overflow-hidden">
+      <CardHeader className="pb-2">
+        <CardTitle>Summary</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Tabs defaultValue="project" className="gap-0">
+          <TabsList className="mx-4 mb-2 w-auto">
+            <TabsTrigger value="project">By Project</TabsTrigger>
+            <TabsTrigger value="issue">By Issue</TabsTrigger>
+          </TabsList>
+          <TabsContent value="project" className="px-4 pb-4">
+            <ul className="space-y-1.5 text-sm">
+              {projectStats.map((s) => (
+                <li key={s.project} className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">{s.project}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatDuration(s.minutes)} ({s.pct}%)
+                  </span>
+                </li>
+              ))}
+              {projectStats.length === 0 && (
+                <li className="text-muted-foreground">No tasks</li>
+              )}
+            </ul>
+          </TabsContent>
+          <TabsContent value="issue" className="max-h-60 overflow-y-auto px-4 pb-4">
+            <ul className="space-y-1.5 text-sm">
+              {issueStats.map((s) => (
+                <li key={s.issue} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 shrink">
+                    <span className="font-medium">{s.issue}</span>
+                    {s.issue !== 'Unassigned' && (
+                      <span className="ml-1 truncate text-xs text-muted-foreground">
+                        {s.name}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatDuration(s.minutes)} ({s.pct}%)
+                  </span>
+                </li>
+              ))}
+              {issueStats.length === 0 && (
+                <li className="text-muted-foreground">No tasks</li>
+              )}
+            </ul>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  )
+}
+
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
   const isMockMode = useAppStore((s) => s.isMockMode)
@@ -151,27 +272,7 @@ function App() {
 
               {/* Right sidebar */}
               <div className="flex flex-col gap-4">
-                <Card className="flex-1">
-                  <CardHeader>
-                    <CardTitle>Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Total hours</span>
-                        <span className="font-medium">164h</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Logged</span>
-                        <span className="font-medium">128h</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Remaining</span>
-                        <span className="font-medium">36h</span>
-                      </li>
-                    </ul>
-                  </CardContent>
-                </Card>
+                <SummaryCard />
                 <Card className="flex-1">
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
