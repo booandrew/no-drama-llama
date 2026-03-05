@@ -28,7 +28,6 @@ interface TimelineChartProps {
   events: CalendarEvent[]
   year: number
   month: number
-  domain?: [number, number]
 }
 
 interface SegmentMeta {
@@ -132,7 +131,6 @@ export function TimelineChart({
   events,
   year,
   month,
-  domain,
 }: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
@@ -170,13 +168,13 @@ export function TimelineChart({
   }, [year, month])
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const chartDomain = domain ?? [0, totalMinutes]
 
-  // Generate day tick values
+  // Generate day tick values (centered within each day)
   const ticks = useMemo(() => {
     const t: number[] = []
+    const half = MINUTES_PER_DAY / 2
     for (let d = 0; d < daysInMonth; d++) {
-      t.push(d * MINUTES_PER_DAY)
+      t.push(d * MINUTES_PER_DAY + half)
     }
     return t
   }, [daysInMonth])
@@ -205,7 +203,7 @@ export function TimelineChart({
         <CartesianGrid vertical={true} horizontal={false} strokeDasharray="3 3" />
         <XAxis
           type="number"
-          domain={chartDomain}
+          domain={[0, totalMinutes]}
           allowDataOverflow={true}
           orientation="top"
           ticks={ticks}

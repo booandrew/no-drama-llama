@@ -17,8 +17,6 @@ import { useCalendarStore } from '@/store/calendar'
 
 type ZoomScale = '1w' | '2w' | '1m'
 
-const MINUTES_PER_DAY = 1440
-
 const MONTH_NAMES = [
   'January',
   'February',
@@ -66,21 +64,11 @@ export function PacaTimeTab() {
   const status = useCalendarStore((s) => s.status)
 
   const [zoom, setZoom] = useState<ZoomScale>('1m')
-  const [windowOffset, setWindowOffset] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
-  const totalMinutes = daysInMonth * MINUTES_PER_DAY
 
   const zoomDays: Record<ZoomScale, number> = { '1w': 7, '2w': 14, '1m': daysInMonth }
-  const windowDays = zoomDays[zoom]
-  const maxOffset = Math.max(
-    0,
-    Math.ceil((daysInMonth - windowDays) / (zoom === '1w' ? 7 : 14)),
-  )
-
-  const domainStart = windowOffset * (zoom === '1w' ? 7 : 14) * MINUTES_PER_DAY
-  const domainEnd = Math.min(domainStart + windowDays * MINUTES_PER_DAY, totalMinutes)
-  const domain: [number, number] = [domainStart, domainEnd]
+  const scaleFactor = daysInMonth / zoomDays[zoom]
 
   const isConnected = status === 'connected' || status === 'done' || status === 'loading'
   const periodOptions = generatePeriodOptions()
@@ -103,7 +91,6 @@ export function PacaTimeTab() {
   const handleZoomChange = (v: string) => {
     if (v) {
       setZoom(v as ZoomScale)
-      setWindowOffset(0)
     }
   }
 
@@ -153,27 +140,6 @@ export function PacaTimeTab() {
             <ToggleGroupItem value="1m">1M</ToggleGroupItem>
           </ToggleGroup>
 
-          {zoom !== '1m' && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWindowOffset((o) => Math.max(0, o - 1))}
-                disabled={windowOffset === 0}
-              >
-                ←
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWindowOffset((o) => Math.min(maxOffset, o + 1))}
-                disabled={windowOffset >= maxOffset}
-              >
-                →
-              </Button>
-            </>
-          )}
-
           <Button variant="default" size="sm" onClick={handleRefresh} disabled={eventsLoading}>
             <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
             Refresh Google Calendar
@@ -190,12 +156,13 @@ export function PacaTimeTab() {
       {events.length > 0 && (
         <Card>
           <CardContent className="overflow-x-auto p-0">
-            <TimelineChart
-              events={events}
-              year={selectedPeriod.year}
-              month={selectedPeriod.month}
-              domain={domain}
-            />
+            <div style={{ minWidth: `max(${scaleFactor * 100}%, ${daysInMonth * 80}px)` }}>
+              <TimelineChart
+                events={events}
+                year={selectedPeriod.year}
+                month={selectedPeriod.month}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
