@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
 import { AppHeader } from '@/components/AppHeader'
+import { LandingPage } from '@/components/LandingPage'
 import { CustomInputsTab } from '@/components/CustomInputsTab'
 import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
@@ -80,10 +81,29 @@ function App() {
   const jiraHydrated = useJiraStore((s) => s._hasHydrated)
   useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
 
+  const [page, setPage] = useState(() =>
+    window.location.hash === '#app' ? 'app' : 'landing',
+  )
+
+  const goToApp = () => {
+    window.location.hash = '#app'
+    setPage('app')
+  }
+
+  useEffect(() => {
+    const onHash = () => setPage(window.location.hash === '#app' ? 'app' : 'landing')
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  if (page === 'landing') {
+    return <LandingPage onEnterApp={goToApp} />
+  }
+
   return (
     <div className="flex h-svh flex-col overflow-hidden">
       <AppHeader />
-      <main className="flex flex-1 flex-col overflow-y-auto p-6">
+      <main className="flex flex-1 flex-col overflow-y-auto px-6 pt-6">
         {activeTab === 'llama-time' && (
           <div className="flex flex-1 flex-col gap-4 min-h-0">
           <LlamaTimeToolbar />
