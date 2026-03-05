@@ -16,6 +16,11 @@ let workerBlobUrl: string | null = null
 let initPromise: Promise<void> | null = null
 
 async function doInit(): Promise<void> {
+  // 0. Close any leftover state (e.g. after HMR hot-reload)
+  if (db || worker) {
+    await closeDuckDB()
+  }
+
   // 1. OPFS check
   const opfsAvailable = await isOPFSAvailable()
   if (!opfsAvailable) {
@@ -66,11 +71,16 @@ async function doInit(): Promise<void> {
 
 /**
  * Initialize DuckDB. Idempotent — returns same promise if called twice.
+ * Cleans up partial state on failure so retry is possible.
  */
 export async function initializeDuckDB(): Promise<void> {
   if (db && conn) return
   if (initPromise) return initPromise
-  initPromise = doInit()
+  initPromise = doInit().catch(async (err) => {
+    // Clean up partial state so OPFS handles are released and retry is possible
+    await closeDuckDB()
+    throw err
+  })
   return initPromise
 }
 

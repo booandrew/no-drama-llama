@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 
+import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
 import { AppHeader } from '@/components/AppHeader'
 import { CustomInputsTab } from '@/components/CustomInputsTab'
 import { MappingsTab } from '@/components/MappingsTab'
@@ -48,14 +49,13 @@ function App() {
           <div className="grid grid-cols-[280px_minmax(0,1fr)_280px] gap-4">
             {/* Left sidebar */}
             <div className="flex flex-col gap-4">
-              <Card className="flex-1">
-                <CardHeader>
-                  <CardTitle>Llama Avatar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-center h-48 rounded-md bg-muted text-muted-foreground text-sm">
-                    Llama image placeholder
-                  </div>
+              <Card>
+                <CardContent className="p-2">
+                  <img
+                    src={llamaAvatarSvg}
+                    alt="Llama Avatar"
+                    className="w-full object-contain"
+                  />
                 </CardContent>
               </Card>
               <Card>

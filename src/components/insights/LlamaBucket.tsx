@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Matter from 'matter-js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import llamaSvgUrl from '@/assets/alpaca-8bit.svg'
+import llamaSvgUrl from '@/assets/73897352_JEMA LUIS 283-03.svg'
 
 const LLAMA_COUNT = 12
 const LLAMA_SIZE = 80

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { DuckDBContext } from './context'
 import type { DuckDBStatus } from './context'
-import { initializeDuckDB } from './init'
+import { closeDuckDB, initializeDuckDB } from './init'
 
 export function DuckDBProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<DuckDBStatus>('loading')
@@ -17,6 +17,9 @@ export function DuckDBProvider({ children }: { children: ReactNode }) {
         setStatus('error')
       })
 
+    return () => {
+      closeDuckDB()
+    }
   }, [])
 
   return (

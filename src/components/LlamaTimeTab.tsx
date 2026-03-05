@@ -5,6 +5,14 @@ import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -422,10 +430,21 @@ export function LlamaTimeTab() {
             />
           </div>
 
-          <CardContent className="flex p-0">
+          <CardContent className="relative flex p-0">
+            {/* Separator line after the 2nd row */}
+            {taskNames.length > 2 && (() => {
+              const h = Math.max(200, taskNames.length * 44 + 60)
+              const rowH = (h - 50) / taskNames.length
+              return (
+                <div
+                  className="absolute left-0 right-0 border-b border-border z-20 pointer-events-none"
+                  style={{ top: 40 + 2 * rowH }}
+                />
+              )
+            })()}
             {/* Sticky labels column */}
             <div
-              className="shrink-0 w-[180px] border-r bg-card z-10 flex flex-col"
+              className="shrink-0 w-[320px] border-r bg-card z-10 flex flex-col"
               style={{ height: Math.max(200, taskNames.length * 44 + 60) }}
             >
               <div style={{ height: 40, flexShrink: 0 }} />
@@ -433,10 +452,23 @@ export function LlamaTimeTab() {
                 {taskNames.map((name) => (
                   <div
                     key={name}
-                    className="flex flex-1 items-center justify-start pl-3 text-sm text-muted-foreground truncate"
+                    className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2"
                     title={name}
                   >
-                    {name.length > 20 ? name.slice(0, 18) + '...' : name}
+                    <span className="text-sm text-muted-foreground truncate shrink min-w-0">
+                      {name.length > 20 ? name.slice(0, 18) + '...' : name}
+                    </span>
+                    <Combobox>
+                      <ComboboxInput
+                        placeholder="—"
+                        className="h-7 w-[140px] shrink-0 text-xs"
+                      />
+                      <ComboboxContent>
+                        <ComboboxList>
+                          <ComboboxEmpty>No results</ComboboxEmpty>
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
                   </div>
                 ))}
               </div>

@@ -25,6 +25,7 @@ import {
   syncCalendarEvents,
   syncTempoCapacity,
 } from '@/lib/sync'
+import { initializeDuckDB } from '@/lib/duckdb/init'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
@@ -213,6 +214,7 @@ export function SourcesTab() {
     setError(null)
 
     try {
+      await initializeDuckDB()
       const { start, end } = getPeriod()
 
       if (activeSubtab === 'jira-issues') {
