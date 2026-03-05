@@ -199,6 +199,9 @@ export function SourcesTab() {
   const selectedDate = useSourcesStore((s) => s.selectedDate)
   const customStart = useSourcesStore((s) => s.customStart)
   const customEnd = useSourcesStore((s) => s.customEnd)
+  const setPeriodMode = useSourcesStore((s) => s.setPeriodMode)
+  const setSelectedDate = useSourcesStore((s) => s.setSelectedDate)
+  const setCustomRange = useSourcesStore((s) => s.setCustomRange)
 
   useEffect(() => {
     loadData()
@@ -250,9 +253,9 @@ export function SourcesTab() {
         selectedDate={selectedDate}
         customStart={customStart}
         customEnd={customEnd}
-        setPeriodMode={useSourcesStore((s) => s.setPeriodMode)}
-        setSelectedDate={useSourcesStore((s) => s.setSelectedDate)}
-        setCustomRange={useSourcesStore((s) => s.setCustomRange)}
+        setPeriodMode={setPeriodMode}
+        setSelectedDate={setSelectedDate}
+        setCustomRange={setCustomRange}
       />
 
       <Tabs

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type KeyboardEvent } from 'react'
 import { X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +54,7 @@ export function MappingForm({ open, onOpenChange, item, onSave }: Props) {
     setKeywords(keywords.filter((k) => k !== kw))
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       addKeyword()

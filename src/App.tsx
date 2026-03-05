@@ -110,6 +110,9 @@ function App() {
           </div>
           </div>
         )}
+        {activeTab === 'sources' && <SourcesTab />}
+        {activeTab === 'custom-inputs' && <CustomInputsTab />}
+        {activeTab === 'mappings' && <MappingsTab />}
         {activeTab === 'wool-insights' && <WoolInsightsTab />}
         {activeTab === 'logs-history' && (
           <div className="text-muted-foreground text-sm">Logs History content</div>

@@ -13,7 +13,6 @@ import {
 import { GoogleCalendarConnectDialog } from '@/components/GoogleCalendarConnectDialog'
 import { JiraConnectDialog } from '@/components/JiraConnectDialog'
 import { TempoConnectDialog } from '@/components/TempoConnectDialog'
-import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'

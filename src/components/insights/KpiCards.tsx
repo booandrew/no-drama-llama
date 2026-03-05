@@ -1,4 +1,4 @@
-import { Clock, FolderKanban, TrendingUp, Trophy } from 'lucide-react'
+import { Clock, FolderKanban, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 interface KpiData {

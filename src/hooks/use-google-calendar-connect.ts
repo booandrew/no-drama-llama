@@ -31,7 +31,7 @@ export function useGoogleCalendarConnect() {
               setStatus('error')
               return
             }
-            setConnected(response.access_token, Number(response.expires_in) || 3600)
+            setConnected(response.access_token, Number(response.expires_in) || 3600, 'org')
           },
           error_callback: () => {
             setStatus('error')

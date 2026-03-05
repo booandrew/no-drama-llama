@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
+import { syncAll } from '@/lib/sync'
 import { useCalendarStore } from '@/store/calendar'
 
 type ZoomScale = '1w' | '2w' | '1m'
@@ -208,42 +209,73 @@ export function LlamaTimeToolbar() {
   const { isConnected, connect } = useGoogleCalendarConnect()
   const periodOptions = generatePeriodOptions()
 
-  return (
-    <div className="flex items-center justify-between">
-      <Select
-        value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
-        onValueChange={(v) => setSelectedPeriod(valueToPeriod(v))}
-      >
-        <SelectTrigger className="w-52">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {periodOptions.map((opt) => (
-            <SelectItem key={periodToValue(opt.year, opt.month)} value={periodToValue(opt.year, opt.month)}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+  const [syncingAll, setSyncingAll] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
-      <div className="flex items-center gap-2">
-        {isConnected ? (
-          <>
-            <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading}>
-              <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
-              Refresh Google Calendar
+  const handleSyncAll = async () => {
+    setSyncingAll(true)
+    setSyncError(null)
+    try {
+      const dateStart = new Date(selectedPeriod.year, selectedPeriod.month, 1)
+        .toISOString()
+        .slice(0, 10)
+      const dateEnd = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1)
+        .toISOString()
+        .slice(0, 10)
+      const result = await syncAll(dateStart, dateEnd)
+      if (result.errors.length > 0) {
+        setSyncError(result.errors.join('; '))
+      }
+    } catch (e) {
+      setSyncError((e as Error).message)
+    } finally {
+      setSyncingAll(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Select
+          value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
+          onValueChange={(v) => setSelectedPeriod(valueToPeriod(v))}
+        >
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {periodOptions.map((opt) => (
+              <SelectItem key={periodToValue(opt.year, opt.month)} value={periodToValue(opt.year, opt.month)}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <>
+              <Button variant="default" size="sm" onClick={handleSyncAll} disabled={syncingAll}>
+                <RefreshCw className={`size-4 ${syncingAll ? 'animate-spin' : ''}`} />
+                Sync ALL
+              </Button>
+              <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading}>
+                <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
+                Refresh Google Calendar
+              </Button>
+              <Button variant="default" size="sm" disabled>
+                I'm good with timelogs, Submit to JIRA
+              </Button>
+            </>
+          ) : (
+            <Button variant="default" size="sm" onClick={connect}>
+              <Calendar className="size-4" />
+              Connect Google Calendar
             </Button>
-            <Button variant="default" size="sm" disabled>
-              I'm good with timelogs, Submit to JIRA
-            </Button>
-          </>
-        ) : (
-          <Button variant="default" size="sm" onClick={connect}>
-            <Calendar className="size-4" />
-            Connect Google Calendar
-          </Button>
-        )}
+          )}
+        </div>
       </div>
+      {syncError && <p className="text-destructive text-sm">{syncError}</p>}
     </div>
   )
 }
