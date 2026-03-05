@@ -460,10 +460,10 @@ export function TimelineChart({
 **Files:**
 - Delete: `src/components/GanttChart.tsx`
 
-- [ ] Delete the old component: `rm src/components/GanttChart.tsx`
-- [ ] Remove D3 dependencies: `pnpm remove d3 @types/d3`
-- [ ] Verify no remaining D3 imports: search for `from 'd3'` or `from "d3"` across the codebase. There should be zero matches.
-- [ ] Verify build passes: `pnpm build`
-- [ ] Run lint: `pnpm lint`
-- [ ] Fix any lint issues if found
-- [ ] Commit: `git add -A && git commit -m "chore: remove GanttChart and D3 dependencies"`
+- [x] Delete the old component: `rm src/components/GanttChart.tsx`
+- [x] Remove D3 dependencies: `pnpm remove d3 @types/d3`
+- [x] Verify no remaining D3 imports: search for `from 'd3'` or `from "d3"` across the codebase. There should be zero matches.
+- [x] Verify build passes: `pnpm build`
+- [x] Run lint: `pnpm lint`
+- [x] Fix any lint issues if found
+- [x] Commit: `git add -A && git commit -m "chore: remove GanttChart and D3 dependencies"`
