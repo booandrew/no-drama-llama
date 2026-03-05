@@ -53,7 +53,11 @@ function LlamaSidebar() {
         >
           <RefreshCw className="inline size-3.5" /> {logged}h / {totalHours}h logged
         </button>
-        <div className="relative flex w-full flex-1 items-center justify-center" role="img" aria-label="Llama Avatar">
+        <div
+          className="relative flex w-full flex-1 items-center justify-center"
+          role="img"
+          aria-label="Llama Avatar"
+        >
           <div className="relative">
             {/* Greyscale layer (unfilled) */}
             <img
@@ -81,9 +85,7 @@ function App() {
   const jiraHydrated = useJiraStore((s) => s._hasHydrated)
   useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
 
-  const [page, setPage] = useState(() =>
-    window.location.hash === '#app' ? 'app' : 'landing',
-  )
+  const [page, setPage] = useState(() => (window.location.hash === '#app' ? 'app' : 'landing'))
 
   const goToApp = () => {
     window.location.hash = '#app'
@@ -106,49 +108,49 @@ function App() {
       <main className="flex flex-1 flex-col overflow-y-auto px-6 pt-6">
         {activeTab === 'llama-time' && (
           <div className="flex flex-1 flex-col gap-4 min-h-0">
-          <LlamaTimeToolbar />
-          <div className="grid flex-1 min-h-0 grid-cols-[280px_minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
-            {/* Left sidebar */}
-            <LlamaSidebar />
+            <LlamaTimeToolbar />
+            <div className="grid flex-1 min-h-0 grid-cols-[280px_minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
+              {/* Left sidebar */}
+              <LlamaSidebar />
 
-            {/* Center — chart */}
-            <LlamaTimeTab />
+              {/* Center — chart */}
+              <LlamaTimeTab />
 
-            {/* Right sidebar */}
-            <div className="flex flex-col gap-4">
-              <Card className="flex-1">
-                <CardHeader>
-                  <CardTitle>Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex justify-between">
-                      <span className="text-muted-foreground">Total hours</span>
-                      <span className="font-medium">164h</span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span className="text-muted-foreground">Logged</span>
-                      <span className="font-medium">128h</span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span className="text-muted-foreground">Remaining</span>
-                      <span className="font-medium">36h</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-              <Card className="flex-1">
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Submit to Jira, auto-fill gaps, export CSV — coming soon.
-                  </p>
-                </CardContent>
-              </Card>
+              {/* Right sidebar */}
+              <div className="flex flex-col gap-4">
+                <Card className="flex-1">
+                  <CardHeader>
+                    <CardTitle>Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex justify-between">
+                        <span className="text-muted-foreground">Total hours</span>
+                        <span className="font-medium">164h</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span className="text-muted-foreground">Logged</span>
+                        <span className="font-medium">128h</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span className="text-muted-foreground">Remaining</span>
+                        <span className="font-medium">36h</span>
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+                <Card className="flex-1">
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Submit to Jira, auto-fill gaps, export CSV — coming soon.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
           </div>
         )}
         {activeTab === 'sources' && <SourcesTab />}
