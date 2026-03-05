@@ -1,50 +1,3 @@
-# Replace D3 Gantt Chart with Recharts Horizontal Bar Chart
-
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Replace the custom D3.js `GanttChart` component with a horizontal stacked bar chart using Recharts + shadcn `ChartContainer`, preserving the same visual timeline of calendar events.
-
-**Architecture:** Stacked horizontal bars with transparent gap segments for positioning. Each event name = Y-axis row. X-axis = minutes from month start. Gap segments are transparent/non-interactive, event segments are colored with tooltips. Zoom (1W/2W/1M) controls XAxis domain.
-
-**Tech Stack:** React 19, TypeScript 5.9, Recharts 2.15.4 (already installed), shadcn/ui chart components, Tailwind CSS v4
-
-## Overview
-
-The current `src/components/GanttChart.tsx` renders a timeline of Google Calendar events using D3.js with imperative SVG manipulation. We replace it with a declarative Recharts-based component that uses shadcn's `ChartContainer`, `ChartTooltip`, etc.
-
-The key insight: we model the timeline as a **stacked bar chart** where each row (event name) has alternating segments: `[gap_0, event_0, gap_1, event_1, ..., tail]`. Gap segments are transparent and create the correct positioning offsets.
-
-## Context
-
-- **Branch:** Will be created from `main`
-- **Current Gantt:** `src/components/GanttChart.tsx` — 322 lines, D3.js, imperative SVG, has popover "Log Time" on click
-- **PacaTimeTab:** `src/components/PacaTimeTab.tsx` — 183 lines, wraps GanttChart, has period selector, zoom toggle (1W/2W/1M), refresh button, manual ResizeObserver for dayWidth
-- **Calendar store:** `src/store/calendar.ts` — provides `CalendarEvent[]` with `summary`, `start.dateTime`, `end.dateTime`
-- **shadcn chart:** `src/components/ui/chart.tsx` — wraps Recharts `ResponsiveContainer`, provides `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartConfig`
-- **Recharts 2.15.4** is already installed
-- **D3** (`d3` + `@types/d3`) will be removed
-- **CSS vars:** `--chart-1` through `--chart-5` for colors, `--destructive` for today marker
-- **Code style:** no semicolons, single quotes, trailing commas, 100 char width, 2-space indent
-
-## Validation Commands
-
-```bash
-pnpm build
-pnpm lint
-```
-
-## Implementation Steps
-
-### Task 1: Create TimelineChart component with data transformation
-
-**Files:**
-- Create: `src/components/TimelineChart.tsx`
-- Reference: `src/store/calendar.ts` (for `CalendarEvent` type)
-- Reference: `src/components/ui/chart.tsx` (for `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartConfig`)
-
-- [x] Create `src/components/TimelineChart.tsx` with the following structure:
-
-```tsx
 import { useMemo } from 'react'
 import {
   Bar,
@@ -321,7 +274,7 @@ export function TimelineChart({
             stackId="a"
             radius={[4, 4, 4, 4]}
             isAnimationActive={false}
-            shape={(props: Record<string, unknown>) => {
+            shape={(props: unknown) => {
               const { x, y, width, height, payload } = props as {
                 x: number
                 y: number
@@ -329,7 +282,7 @@ export function TimelineChart({
                 height: number
                 payload: { name: string }
               }
-              if (!width || width <= 0) return null
+              if (!width || width <= 0) return <rect />
               return (
                 <rect
                   x={x}
@@ -357,113 +310,3 @@ export function TimelineChart({
     </ChartContainer>
   )
 }
-```
-
-- [x] Verify TypeScript compiles: `pnpm build`
-- [x] Commit: `git add src/components/TimelineChart.tsx && git commit -m "feat: add TimelineChart component with Recharts stacked bars"`
-
----
-
-### Task 2: Update PacaTimeTab to use TimelineChart
-
-**Files:**
-- Modify: `src/components/PacaTimeTab.tsx`
-- Reference: `src/components/TimelineChart.tsx` (the new component)
-
-- [ ] In `src/components/PacaTimeTab.tsx`, make these changes:
-
-1. **Replace import:** Change `import { GanttChart } from '@/components/GanttChart'` to `import { TimelineChart } from '@/components/TimelineChart'`
-
-2. **Add state for window navigation:** Add `windowOffset` state for sub-month zoom views:
-   ```tsx
-   const [windowOffset, setWindowOffset] = useState(0)
-   ```
-
-3. **Remove ResizeObserver and dayWidth logic:** Delete these lines:
-   - The `containerWidth` state and `wrapperRef` (keep the outer div ref only if needed for other purposes, otherwise remove)
-   - The `useEffect` with `ResizeObserver`
-   - The `daysInMonth`, `fixedWidth`, `dayWidth` calculations
-   - The `FIXED_DAY_WIDTH`, `MIN_DAY_WIDTH`, `GANTT_MARGIN_LR` constants
-
-4. **Compute `domain` from zoom + offset:** Add after the zoom state:
-   ```tsx
-   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
-   const MINUTES_PER_DAY = 1440
-   const totalMinutes = daysInMonth * MINUTES_PER_DAY
-
-   const zoomDays: Record<ZoomScale, number> = { '1w': 7, '2w': 14, '1m': daysInMonth }
-   const windowDays = zoomDays[zoom]
-   const maxOffset = Math.max(0, Math.ceil((daysInMonth - windowDays) / (zoom === '1w' ? 7 : 14)))
-
-   const domainStart = windowOffset * (zoom === '1w' ? 7 : 14) * MINUTES_PER_DAY
-   const domainEnd = Math.min(domainStart + windowDays * MINUTES_PER_DAY, totalMinutes)
-   const domain: [number, number] = [domainStart, domainEnd]
-   ```
-
-5. **Reset windowOffset when zoom changes:**
-   ```tsx
-   const handleZoomChange = (v: string) => {
-     if (v) {
-       setZoom(v as ZoomScale)
-       setWindowOffset(0)
-     }
-   }
-   ```
-
-6. **Add prev/next navigation buttons** next to the zoom toggle (only visible when zoom is not '1m'):
-   ```tsx
-   {zoom !== '1m' && (
-     <>
-       <Button
-         variant="outline"
-         size="sm"
-         onClick={() => setWindowOffset((o) => Math.max(0, o - 1))}
-         disabled={windowOffset === 0}
-       >
-         ←
-       </Button>
-       <Button
-         variant="outline"
-         size="sm"
-         onClick={() => setWindowOffset((o) => Math.min(maxOffset, o + 1))}
-         disabled={windowOffset >= maxOffset}
-       >
-         →
-       </Button>
-     </>
-   )}
-   ```
-   Import `ChevronLeft` and `ChevronRight` from lucide-react is optional — plain arrows `←` `→` are fine.
-
-7. **Replace GanttChart with TimelineChart:**
-   ```tsx
-   <TimelineChart
-     events={events}
-     year={selectedPeriod.year}
-     month={selectedPeriod.month}
-     domain={domain}
-   />
-   ```
-
-8. **Update zoom ToggleGroup to use `handleZoomChange`:**
-   ```tsx
-   <ToggleGroup ... onValueChange={handleZoomChange}>
-   ```
-
-- [ ] Verify build passes: `pnpm build`
-- [ ] Commit: `git add src/components/PacaTimeTab.tsx && git commit -m "feat: replace GanttChart with TimelineChart in PacaTimeTab"`
-
----
-
-### Task 3: Remove old GanttChart and D3 dependencies
-
-**Files:**
-- Delete: `src/components/GanttChart.tsx`
-
-- [ ] Delete the old component: `rm src/components/GanttChart.tsx`
-- [ ] Remove D3 dependencies: `pnpm remove d3 @types/d3`
-- [ ] Verify no remaining D3 imports: search for `from 'd3'` or `from "d3"` across the codebase. There should be zero matches.
-- [ ] Verify build passes: `pnpm build`
-- [ ] Run lint: `pnpm lint`
-- [ ] Fix any lint issues if found
-- [ ] Commit: `git add -A && git commit -m "chore: remove GanttChart and D3 dependencies"`
