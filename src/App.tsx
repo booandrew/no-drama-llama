@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import llamaSvg from '@/assets/llama-svgrepo-com.svg'
+import { useCalendarStore } from '@/store/calendar'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
@@ -17,39 +18,42 @@ interface CalendarEvent {
 }
 
 function App() {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const { status, accessToken, setConnected, setStatus, setExpired, isTokenValid } =
+    useCalendarStore()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null)
-  const accessTokenRef = useRef<string | null>(null)
 
+  // On mount: check if restored token is still valid
   useEffect(() => {
-    console.log('[GIS] Initializing... CLIENT_ID:', CLIENT_ID ? `${CLIENT_ID.slice(0, 20)}...` : 'MISSING')
-    console.log('[GIS] Current origin:', window.location.origin)
+    if (accessToken) {
+      if (isTokenValid()) {
+        setStatus('connected')
+      } else {
+        setExpired()
+      }
+    }
+  }, [])
 
+  // Initialize GIS token client
+  useEffect(() => {
     const interval = setInterval(() => {
       if (window.google?.accounts?.oauth2) {
         clearInterval(interval)
-        console.log('[GIS] google.accounts.oauth2 loaded, creating token client')
         tokenClientRef.current = google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID,
           scope: SCOPES,
           callback: (response) => {
-            console.log('[GIS] callback fired, keys:', Object.keys(response))
             if (response.error) {
-              console.error('[GIS] Token error:', response.error, response)
               setStatus('error')
               return
             }
-            accessTokenRef.current = response.access_token
-            console.log('[GIS] Got access token, length:', response.access_token?.length)
+            setConnected(response.access_token, Number(response.expires_in) || 3600)
             fetchEvents(response.access_token)
           },
-          error_callback: (error) => {
-            console.error('[GIS] Error callback:', JSON.stringify(error))
+          error_callback: () => {
             setStatus('error')
           },
         })
-        console.log('[GIS] Token client created successfully')
       }
     }, 100)
     return () => clearInterval(interval)
@@ -79,6 +83,10 @@ function App() {
         })
 
         if (!res.ok) {
+          if (res.status === 401) {
+            setExpired()
+            return
+          }
           throw new Error(`Calendar API error: ${res.status} ${res.statusText}`)
         }
 
@@ -87,7 +95,6 @@ function App() {
         pageToken = data.nextPageToken
       } while (pageToken)
 
-      console.log(`[Calendar] Fetched ${allEvents.length} events:`, allEvents)
       setEvents(allEvents)
       setStatus('done')
     } catch (err) {
@@ -97,32 +104,47 @@ function App() {
   }, [])
 
   const handleConnect = () => {
-    console.log('[GIS] handleConnect called, tokenClient exists:', !!tokenClientRef.current)
-    if (!tokenClientRef.current) {
-      console.error('[GIS] Token client not initialized yet')
+    if (!tokenClientRef.current) return
+    tokenClientRef.current.requestAccessToken()
+  }
+
+  const handleFetchEvents = () => {
+    if (!accessToken || !isTokenValid()) {
+      setExpired()
       return
     }
-    console.log('[GIS] Calling requestAccessToken...')
-    tokenClientRef.current.requestAccessToken()
-    console.log('[GIS] requestAccessToken called (popup should appear)')
+    fetchEvents(accessToken)
   }
 
   return (
     <div className="mx-auto flex min-h-svh max-w-3xl flex-col items-center gap-6 p-8">
       <img src={llamaSvg} alt="Llama" className="h-32 w-32" />
 
-      <button
-        onClick={handleConnect}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-6 py-2 text-sm font-medium"
-      >
-        Connect Google Calendar
-      </button>
+      {(status === 'idle' || status === 'expired') && (
+        <button
+          onClick={handleConnect}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-6 py-2 text-sm font-medium"
+        >
+          {status === 'expired' ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+        </button>
+      )}
+
+      {(status === 'connected' || status === 'done') && (
+        <button
+          onClick={handleFetchEvents}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-6 py-2 text-sm font-medium"
+        >
+          Fetch Events
+        </button>
+      )}
 
       <p className="text-muted-foreground text-sm">
         {status === 'idle' && 'Not connected'}
+        {status === 'connected' && 'Connected — click Fetch Events to load data'}
         {status === 'loading' && 'Fetching events...'}
         {status === 'done' && `Connected — ${events.length} events`}
         {status === 'error' && 'Error — check console'}
+        {status === 'expired' && 'Token expired — please reconnect'}
       </p>
 
       {events.length > 0 && (
