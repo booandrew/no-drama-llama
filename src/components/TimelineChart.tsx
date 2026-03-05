@@ -15,37 +15,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import type { JiraIssue } from '@/lib/jira'
 import type { CalendarEvent } from '@/store/calendar'
 
 const MINUTES_PER_DAY = 1440
 
-const Y_AXIS_WIDTH = 340
-const NAME_COL_W = 158
-const ISSUE_COL_W = 174
-
-const COLOR_MAPPED = 'var(--chart-1)'
-const COLOR_UNMAPPED = '#ef4444'
-
-const CHART_CONFIG: ChartConfig = {
-  events: { label: 'Events', color: COLOR_MAPPED },
-}
+const CHART_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+]
 
 interface TimelineChartProps {
   events: CalendarEvent[]
   year: number
   month: number
   domain?: [number, number]
-  issueMapping?: Record<string, string>
-  jiraIssues?: JiraIssue[]
-  onIssueChange?: (rowName: string, issueKey: string) => void
 }
 
 interface SegmentMeta {
@@ -136,101 +122,35 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
   return { data, taskNames, maxSlots, totalMinutes, segmentMeta }
 }
 
-const ROW_H = 28
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomYAxisTick(props: any) {
-  const {
-    x,
-    y,
-    payload,
-    issueMapping,
-    jiraIssues,
-    onIssueChange,
-  }: {
-    x: number
-    y: number
-    payload: { value: string }
-    issueMapping: Record<string, string>
-    jiraIssues: JiraIssue[]
-    onIssueChange: (name: string, issueKey: string) => void
-  } = props
-
-  const name = payload.value
-  const issueKey = issueMapping[name] ?? ''
-
-  return (
-    <foreignObject
-      x={x - Y_AXIS_WIDTH + 4}
-      y={y - ROW_H / 2}
-      width={Y_AXIS_WIDTH - 8}
-      height={ROW_H}
-      overflow="visible"
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          height: ROW_H,
-          gap: 4,
-          width: '100%',
-        }}
-      >
-        <span
-          style={{
-            width: NAME_COL_W,
-            fontSize: 12,
-            lineHeight: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-          title={name}
-        >
-          {name}
-        </span>
-        <div style={{ width: ISSUE_COL_W - 8, flexShrink: 0 }}>
-          <Select
-            value={issueKey || '__none__'}
-            onValueChange={(v: string) => onIssueChange(name, v === '__none__' ? '' : v)}
-          >
-            <SelectTrigger className="h-6 text-xs px-2">
-              <SelectValue placeholder="Map issue…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">—</SelectItem>
-              {jiraIssues.map((issue) => (
-                <SelectItem key={issue.key} value={issue.key}>
-                  <span className="font-mono">{issue.key}</span>
-                  <span className="text-muted-foreground ml-1">
-                    {issue.summary.length > 24
-                      ? issue.summary.slice(0, 22) + '…'
-                      : issue.summary}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </foreignObject>
-  )
-}
-
 export function TimelineChart({
   events,
   year,
   month,
   domain,
-  issueMapping = {},
-  jiraIssues = [],
-  onIssueChange = () => {},
 }: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
     [events, year, month],
   )
+
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {}
+    taskNames.forEach((name, i) => {
+      config[name] = {
+        label: name.length > 20 ? name.slice(0, 18) + '...' : name,
+        color: CHART_COLORS[i % CHART_COLORS.length],
+      }
+    })
+    return config
+  }, [taskNames])
+
+  const colorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    taskNames.forEach((name, i) => {
+      map.set(name, CHART_COLORS[i % CHART_COLORS.length])
+    })
+    return map
+  }, [taskNames])
 
   const todayMinutes = useMemo(() => {
     const now = new Date()
@@ -268,16 +188,7 @@ export function TimelineChart({
   return (
     <>
       <div className="relative">
-        {/* Column headers */}
-        <div
-          className="flex items-center border-b text-xs font-medium text-muted-foreground"
-          style={{ paddingLeft: 14, paddingTop: 4, paddingBottom: 4 }}
-        >
-          <div style={{ width: NAME_COL_W }}>Name</div>
-          <div style={{ width: ISSUE_COL_W - 8 }}>Issue Code</div>
-        </div>
-
-        <ChartContainer config={CHART_CONFIG} className="w-full" style={{ height: chartHeight }}>
+        <ChartContainer config={chartConfig} className="w-full" style={{ height: chartHeight }}>
           <BarChart
             layout="vertical"
             data={data}
@@ -299,15 +210,8 @@ export function TimelineChart({
             <YAxis
               type="category"
               dataKey="name"
-              width={Y_AXIS_WIDTH}
-              tick={(tickProps: Record<string, unknown>) => (
-                <CustomYAxisTick
-                  {...tickProps}
-                  issueMapping={issueMapping}
-                  jiraIssues={jiraIssues}
-                  onIssueChange={onIssueChange}
-                />
-              )}
+              width={180}
+              tickFormatter={(val: string) => (val.length > 20 ? val.slice(0, 18) + '...' : val)}
               axisLine={false}
               tickLine={false}
             />
@@ -345,9 +249,6 @@ export function TimelineChart({
                   if (!width || width <= 0) return <rect />
                   const metaKey = `${payload.name}::event_${i}`
                   const meta = segmentMeta.get(metaKey)
-                  const mapped = !!issueMapping[payload.name]
-                  const fill = mapped ? COLOR_MAPPED : COLOR_UNMAPPED
-                  const fillOpacity = mapped ? 0.9 : 0.5
                   return (
                     <rect
                       x={x}
@@ -355,11 +256,8 @@ export function TimelineChart({
                       width={width}
                       height={height}
                       rx={4}
-                      fill={fill}
-                      fillOpacity={fillOpacity}
-                      stroke={fill}
-                      strokeWidth={1}
-                      strokeOpacity={mapped ? 1 : 0.8}
+                      fill={colorMap.get(payload.name) ?? CHART_COLORS[0]}
+                      opacity={0.85}
                       className="cursor-pointer hover:opacity-100"
                       onClick={() => {
                         if (meta) {

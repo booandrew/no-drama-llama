@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useCalendarStore, type CalendarEvent } from '@/store/calendar'
-import { useJiraStore } from '@/store/jira'
 
 type ZoomScale = '1w' | '2w' | '1m'
 
@@ -204,8 +203,6 @@ export function LlamaTimeTab() {
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
 
-  const jiraIssues = useJiraStore((s) => s.issues)
-  const [issueMapping, setIssueMapping] = useState<Record<string, string>>({})
 
   const [zoom, setZoom] = useState<ZoomScale>('1m')
   const [windowOffset, setWindowOffset] = useState(0)
@@ -303,11 +300,6 @@ export function LlamaTimeTab() {
                 year={selectedPeriod.year}
                 month={selectedPeriod.month}
                 domain={domain}
-                issueMapping={issueMapping}
-                jiraIssues={jiraIssues}
-                onIssueChange={(rowName, issueKey) =>
-                  setIssueMapping((prev) => ({ ...prev, [rowName]: issueKey }))
-                }
               />
             </div>
           </CardContent>
