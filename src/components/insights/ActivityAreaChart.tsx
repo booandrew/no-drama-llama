@@ -8,15 +8,11 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PROJECTS } from './mock-data'
+import { PROJECTS, PROJECT_COLORS } from './mock-data'
 
-const chartConfig = {
-  'PROJ-A': { label: 'PROJ-A', color: 'var(--chart-1)' },
-  'PROJ-B': { label: 'PROJ-B', color: 'var(--chart-2)' },
-  'PROJ-C': { label: 'PROJ-C', color: 'var(--chart-3)' },
-  'PROJ-D': { label: 'PROJ-D', color: 'var(--chart-4)' },
-  'PROJ-E': { label: 'PROJ-E', color: 'var(--chart-5)' },
-} satisfies ChartConfig
+const chartConfig = Object.fromEntries(
+  PROJECTS.map((p) => [p, { label: p, color: PROJECT_COLORS[p] }]),
+) satisfies ChartConfig
 
 interface Props {
   data: Record<string, string | number>[]

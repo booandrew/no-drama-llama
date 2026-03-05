@@ -37,7 +37,7 @@ export function KpiCards({ data }: { data: KpiData }) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{item.label}</p>
-              <p className="text-xl font-semibold">{item.value}</p>
+              <p className="text-3xl font-semibold">{item.value}</p>
             </div>
           </CardContent>
         </Card>

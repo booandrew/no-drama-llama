@@ -1,5 +1,13 @@
 export const PROJECTS = ['PROJ-A', 'PROJ-B', 'PROJ-C', 'PROJ-D', 'PROJ-E'] as const
 
+export const PROJECT_COLORS: Record<string, string> = {
+  'PROJ-A': 'var(--chart-1)',
+  'PROJ-B': 'var(--chart-2)',
+  'PROJ-C': 'var(--chart-3)',
+  'PROJ-D': 'var(--chart-4)',
+  'PROJ-E': 'var(--chart-5)',
+}
+
 export const MONTHS = [
   'Jan',
   'Feb',

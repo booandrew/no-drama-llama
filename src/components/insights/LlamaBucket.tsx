@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Matter from 'matter-js'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import llamaSvgUrl from '@/assets/73897352_JEMA LUIS 283-03.svg'
 
 const LLAMA_COUNT = 30
@@ -86,6 +86,7 @@ export function LlamaBucket() {
     <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
       <CardHeader className="shrink-0 px-4 py-3">
         <CardTitle>My herd of LLamas</CardTitle>
+        <CardDescription>You have collected {llamas.length} llamas to your herd</CardDescription>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 px-0 pb-0">
         <div
