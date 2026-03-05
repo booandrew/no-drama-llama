@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import {
   ChartContainer,
   ChartTooltip,
@@ -6,6 +6,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PROJECT_COLORS } from './mock-data'
 
 const chartConfig = {
   hours: {
@@ -40,7 +41,11 @@ export function ProjectsBarChart({ data, periodLabel }: Props) {
             />
             <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="hours" fill="var(--color-hours)" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
+              {data.map((entry) => (
+                <Cell key={entry.project} fill={PROJECT_COLORS[entry.project] ?? 'var(--chart-1)'} />
+              ))}
+            </Bar>
           </BarChart>
         </ChartContainer>
       </CardContent>
