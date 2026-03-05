@@ -29,6 +29,25 @@ export interface TempoHolidayScheme {
   }[]
 }
 
+interface DaySchedule {
+  date: string
+  requiredSeconds: number
+  type: 'WORKING_DAY' | 'NON_WORKING_DAY' | 'HOLIDAY' | 'HOLIDAY_AND_NON_WORKING_DAY'
+  holiday?: {
+    id: number
+    name: string
+    date: string
+    durationSeconds: number
+    schemeId: number
+    type: string
+  }
+}
+
+interface DayScheduleResults {
+  results: DaySchedule[]
+  metadata: { count: number; offset: number; limit: number }
+}
+
 // ── API ───────────────────────────────────────────────────────────────
 
 function handleAuth(res: Response) {
@@ -41,69 +60,59 @@ function handleAuth(res: Response) {
   }
 }
 
-export async function fetchWorkloadSchemes(): Promise<TempoWorkloadScheme[]> {
-  const res = await fetch('/tempo-api/4/workload-schemes', {
-    headers: headers(),
-  })
-  handleAuth(res)
-  if (!res.ok) throw new Error(`Tempo workload schemes: ${res.status}`)
-  const data = await res.json()
-  const schemes: TempoWorkloadScheme[] = []
-
-  for (const s of data.results ?? []) {
-    const detailRes = await fetch(`/tempo-api/4/workload-schemes/${s.id}`, {
-      headers: headers(),
-    })
-    if (!detailRes.ok) continue
-    const detail = await detailRes.json()
-    schemes.push({
-      id: s.id,
-      name: s.name ?? '',
-      days: (detail.days ?? []).map((d: { day: string; requiredSeconds: number }) => ({
-        day: dayNameToNumber(d.day),
-        requiredSeconds: d.requiredSeconds,
-      })),
-    })
-  }
-
-  return schemes
-}
-
-export async function fetchHolidaySchemes(
+export async function fetchUserSchedule(
   dateStart: string,
   dateEnd: string,
-): Promise<TempoHolidayScheme[]> {
-  const res = await fetch('/tempo-api/4/holiday-schemes', {
+): Promise<{ workload: TempoWorkloadScheme[]; holidays: TempoHolidayScheme[] }> {
+  const params = new URLSearchParams({
+    from: dateStart.slice(0, 10),
+    to: dateEnd.slice(0, 10),
+  })
+  const res = await fetch(`/tempo-api/4/user-schedule?${params}`, {
     headers: headers(),
   })
   handleAuth(res)
-  if (!res.ok) throw new Error(`Tempo holiday schemes: ${res.status}`)
-  const data = await res.json()
-  const schemes: TempoHolidayScheme[] = []
+  if (!res.ok) throw new Error(`Tempo user schedule: ${res.status}`)
+  const data: DayScheduleResults = await res.json()
 
-  for (const s of data.results ?? []) {
-    const params = new URLSearchParams({ from: dateStart, to: dateEnd })
-    const holRes = await fetch(`/tempo-api/4/holiday-schemes/${s.id}/holidays?${params}`, {
-      headers: headers(),
-    })
-    if (!holRes.ok) continue
-    const holData = await holRes.json()
-    schemes.push({
-      id: s.id,
-      name: s.name ?? '',
-      holidays: (holData.results ?? []).map(
-        (h: { id: number; name: string; date: string; durationSeconds: number; type: string }) => ({
-          id: h.id,
-          name: h.name,
-          date: h.date,
-          durationSeconds: h.durationSeconds,
-          type: h.type,
-        }),
-      ),
-    })
+  // Build workload: aggregate requiredSeconds per day-of-week from working days
+  const dayTotals = new Map<number, { sum: number; count: number }>()
+  for (const d of data.results) {
+    const dow = new Date(d.date).getDay()
+    const entry = dayTotals.get(dow) ?? { sum: 0, count: 0 }
+    entry.sum += d.requiredSeconds
+    entry.count += 1
+    dayTotals.set(dow, entry)
   }
+  const workloadDays: { day: number; requiredSeconds: number }[] = []
+  for (const [day, { sum, count }] of dayTotals) {
+    workloadDays.push({ day, requiredSeconds: Math.round(sum / count) })
+  }
+  const workload: TempoWorkloadScheme[] = [
+    { id: 0, name: 'User Schedule', days: workloadDays },
+  ]
 
-  return schemes
+  // Collect holidays
+  const holidayMap = new Map<number, TempoHolidayScheme['holidays'][number]>()
+  let schemeId = 0
+  for (const d of data.results) {
+    if (d.holiday) {
+      schemeId = d.holiday.schemeId
+      holidayMap.set(d.holiday.id, {
+        id: d.holiday.id,
+        name: d.holiday.name,
+        date: d.holiday.date,
+        durationSeconds: d.holiday.durationSeconds,
+        type: d.holiday.type,
+      })
+    }
+  }
+  const holidays: TempoHolidayScheme[] =
+    holidayMap.size > 0
+      ? [{ id: schemeId, name: 'User Holiday Scheme', holidays: [...holidayMap.values()] }]
+      : []
+
+  return { workload, holidays }
 }
 
 // ── Worklogs ─────────────────────────────────────────────────────────
@@ -174,15 +183,3 @@ export async function fetchTempoWorklogs(
   return { worklogs, issueIds: [...issueIdSet] }
 }
 
-function dayNameToNumber(name: string): number {
-  const map: Record<string, number> = {
-    SUNDAY: 0,
-    MONDAY: 1,
-    TUESDAY: 2,
-    WEDNESDAY: 3,
-    THURSDAY: 4,
-    FRIDAY: 5,
-    SATURDAY: 6,
-  }
-  return map[name.toUpperCase()] ?? -1
-}

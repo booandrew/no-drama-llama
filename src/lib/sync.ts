@@ -21,7 +21,7 @@ import type {
   SrcTempoHoliday,
 } from '@/lib/duckdb/queries'
 import { fetchIssues, fetchIssuesByIds, fetchWorklogs } from '@/lib/jira'
-import { fetchTempoWorklogs, fetchWorkloadSchemes, fetchHolidaySchemes } from '@/lib/tempo'
+import { fetchTempoWorklogs, fetchUserSchedule } from '@/lib/tempo'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
@@ -244,13 +244,15 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
     throw new Error('Tempo not connected: no API token')
   }
 
-  // Fetch workload schemes (days of week with required hours)
-  // Falls back to 8h Mon-Fri if user lacks Tempo admin permission
-  let workloadSchemes: Awaited<ReturnType<typeof fetchWorkloadSchemes>> = []
+  // Fetch user schedule (workload + holidays) via user-level endpoint
+  let workloadSchemes: import('@/lib/tempo').TempoWorkloadScheme[] = []
+  let holidaySchemes: import('@/lib/tempo').TempoHolidayScheme[] = []
   try {
-    workloadSchemes = await fetchWorkloadSchemes()
+    const schedule = await fetchUserSchedule(dateStart, dateEnd)
+    workloadSchemes = schedule.workload
+    holidaySchemes = schedule.holidays
   } catch (e) {
-    console.warn('[Tempo] Workload schemes unavailable, using 8h Mon-Fri default:', e)
+    console.warn('[Tempo] User schedule unavailable, using 8h Mon-Fri default:', e)
     workloadSchemes = [
       {
         id: 0,
@@ -269,14 +271,6 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
   )
   await upsertSrcTempoWorkloadDays(srcWorkloadDays)
 
-  // Fetch holiday schemes for the period
-  // Falls back to empty if user lacks permission
-  let holidaySchemes: Awaited<ReturnType<typeof fetchHolidaySchemes>> = []
-  try {
-    holidaySchemes = await fetchHolidaySchemes(dateStart, dateEnd)
-  } catch (e) {
-    console.warn('[Tempo] Holiday schemes unavailable:', e)
-  }
   const srcHolidays: SrcTempoHoliday[] = holidaySchemes.flatMap((s) =>
     s.holidays.map((h) => ({
       scheme_id: String(s.id),
