@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RefreshCw } from 'lucide-react'
 
+import { GanttChart } from '@/components/GanttChart'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -9,14 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { useCalendarStore } from '@/store/calendar'
 
 const MONTH_NAMES = [
@@ -130,49 +123,11 @@ export function PacaTimeTab() {
       )}
 
       {events.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Attendees</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {events.map((event) => {
-              const start = event.start?.dateTime ?? event.start?.date ?? ''
-              const end = event.end?.dateTime ?? event.end?.date ?? ''
-              const s = start ? new Date(start) : null
-              const e = end ? new Date(end) : null
-              const diffMin = s && e ? Math.round((e.getTime() - s.getTime()) / 60000) : 0
-              const h = Math.floor(diffMin / 60)
-              const m = diffMin % 60
-              const duration = h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
-
-              return (
-                <TableRow key={event.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {s
-                      ? s.toLocaleString('ru', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '\u2014'}
-                  </TableCell>
-                  <TableCell className="font-medium">{event.summary ?? '(no title)'}</TableCell>
-                  <TableCell>{duration}</TableCell>
-                  <TableCell>{event.eventType ?? '\u2014'}</TableCell>
-                  <TableCell>{event.attendees?.length ?? 0}</TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+        <GanttChart
+          events={events}
+          year={selectedPeriod.year}
+          month={selectedPeriod.month}
+        />
       )}
     </div>
   )
