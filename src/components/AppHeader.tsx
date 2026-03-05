@@ -13,6 +13,8 @@ import {
 import llamaSvg from '@/assets/llama-svgrepo-com.svg'
 import { IntegrationsPopover } from '@/components/IntegrationsPopover'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +29,8 @@ import { useAppStore } from '@/store/app'
 export function AppHeader() {
   const activeTab = useAppStore((s) => s.activeTab)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
+  const isMockMode = useAppStore((s) => s.isMockMode)
+  const toggleMockMode = useAppStore((s) => s.toggleMockMode)
   const { theme, setTheme } = useTheme()
   const [clearing, setClearing] = useState(false)
 
@@ -58,6 +62,12 @@ export function AppHeader() {
         </TabsList>
       </Tabs>
       <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Switch id="mock-mode" checked={isMockMode} onCheckedChange={toggleMockMode} />
+          <Label htmlFor="mock-mode" className="text-xs cursor-pointer">
+            Mock
+          </Label>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">

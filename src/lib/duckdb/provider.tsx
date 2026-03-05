@@ -18,7 +18,8 @@ export function DuckDBProvider({ children }: { children: ReactNode }) {
       })
 
     return () => {
-      closeDuckDB()
+      // Wait for init to settle before tearing down to avoid OPFS handle races
+      initializeDuckDB().catch(() => {}).finally(() => closeDuckDB())
     }
   }, [])
 

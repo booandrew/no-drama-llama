@@ -46,12 +46,32 @@ async function doInit(): Promise<void> {
   db = new duckdb.AsyncDuckDB(logger, worker)
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
 
-  // 5. Open with OPFS
-  await db.open({
-    path: DB_PATH,
-    accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
-    query: { castDecimalToDouble: true },
-  })
+  // 5. Open with OPFS (retry to handle stale access handles after HMR / remount)
+  const MAX_RETRIES = 3
+  const RETRY_DELAY_MS = 300
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await db.open({
+        path: DB_PATH,
+        accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
+        query: { castDecimalToDouble: true },
+      })
+      break
+    } catch (err) {
+      if (
+        attempt < MAX_RETRIES &&
+        err instanceof Error &&
+        err.message.includes('Access Handle')
+      ) {
+        if (import.meta.env.DEV) {
+          console.warn(`[DuckDB] OPFS handle busy, retrying (${attempt + 1}/${MAX_RETRIES})…`)
+        }
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
 
   // 6. Connect
   conn = await db.connect()
