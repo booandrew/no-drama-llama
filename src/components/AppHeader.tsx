@@ -19,9 +19,9 @@ export function AppHeader() {
         className="flex-row"
       >
         <TabsList>
-          <TabsTrigger value="paca-time" className="gap-1.5">
+          <TabsTrigger value="llama-time" className="gap-1.5">
             <img src={llamaSvg} alt="" className="size-4" />
-            PacaTime
+            Llama Time
           </TabsTrigger>
           <TabsTrigger value="wool-insights">Wool Insights</TabsTrigger>
           <TabsTrigger value="logs-history">Logs History</TabsTrigger>
