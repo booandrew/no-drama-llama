@@ -310,7 +310,7 @@ for (const day of [...allDays(2026, 0), ...allDays(2026, 1)]) {
   })
 }
 
-// ── DDS Tasks (15 fixed rows: 5 with issue data, 10 without) ─────────
+// ── DDS Tasks (15 per month: 5 with issue data, 10 without) ──────────
 
 const TASK_DESCRIPTIONS = [
   'Team standup',
@@ -330,8 +330,10 @@ const TASK_DESCRIPTIONS = [
   'Release planning',
 ]
 
-// First 5 tasks have issue data, remaining 10 do not
-const TASK_ISSUES: (IssueEntry | null)[] = [
+const TASK_DURATIONS = [60, 90, 120, 60, 90, 30, 60, 120, 60, 90, 60, 30, 60, 120, 90]
+
+// 5 with issue data per month, 10 without
+const MONTH_ISSUES: (IssueEntry | null)[] = [
   issues[0], // ALPHA-1
   issues[6], // ALPHA-7
   issues[1], // ALPHA-2
@@ -341,27 +343,32 @@ const TASK_ISSUES: (IssueEntry | null)[] = [
   null, null, null, null, null,
 ]
 
-// Spread tasks across Jan–Feb working days
-const taskDays = [...workingDays(2026, 0), ...workingDays(2026, 1)]
+function generateMonthTasks(year: number, month: number, idOffset: number): DdsTask[] {
+  const days = workingDays(year, month)
+  return TASK_DESCRIPTIONS.map((desc, i) => {
+    const day = days[Math.floor((i * days.length) / 15)]
+    const hour = 9 + (i % 8)
+    const durationMin = TASK_DURATIONS[i]
+    const durationStr = durationMin >= 60 ? `${Math.round(durationMin / 60)}h` : `${durationMin}m`
+    const startDT = `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`
+    const issue = MONTH_ISSUES[i]
 
-export const mockDdsTasks: DdsTask[] = TASK_DESCRIPTIONS.map((desc, i) => {
-  const day = taskDays[i % taskDays.length]
-  const hour = 9 + (i % 8)
-  const durationMin = [60, 90, 120, 60, 90, 30, 60, 120, 60, 90, 60, 30, 60, 120, 90][i]
-  const durationStr = durationMin >= 60 ? `${Math.round(durationMin / 60)}h` : `${durationMin}m`
-  const startDT = `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`
-  const issue = TASK_ISSUES[i]
+    return {
+      task_id: `task_${idOffset + i}`,
+      description: desc,
+      duration: durationStr,
+      start_time: startDT,
+      issue_key: issue?.key ?? null,
+      issue_name: issue?.summary ?? null,
+      project_key: issue?.project_key ?? null,
+      revision: 1,
+      source: 'gcal',
+      source_id: `cal_${80001 + idOffset - 90001 + i}`,
+    }
+  })
+}
 
-  return {
-    task_id: `task_${90001 + i}`,
-    description: desc,
-    duration: durationStr,
-    start_time: startDT,
-    issue_key: issue?.key ?? null,
-    issue_name: issue?.summary ?? null,
-    project_key: issue?.project_key ?? null,
-    revision: 1,
-    source: 'gcal',
-    source_id: `cal_${80001 + i}`,
-  }
-})
+export const mockDdsTasks: DdsTask[] = [
+  ...generateMonthTasks(2026, 0, 90001),
+  ...generateMonthTasks(2026, 1, 90016),
+]
