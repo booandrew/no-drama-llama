@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
-  CartesianGrid,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -32,6 +31,7 @@ interface TimelineChartProps {
   year: number
   month: number
   domain?: [number, number]
+  hideYAxis?: boolean
 }
 
 interface SegmentMeta {
@@ -127,6 +127,7 @@ export function TimelineChart({
   year,
   month,
   domain,
+  hideYAxis,
 }: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
@@ -163,7 +164,7 @@ export function TimelineChart({
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const chartDomain = domain ?? [0, totalMinutes]
 
-  // Generate day tick values (centered within each day)
+  // Day label ticks at noon (centered within each day)
   const ticks = useMemo(() => {
     const t: number[] = []
     const half = MINUTES_PER_DAY / 2
@@ -171,6 +172,15 @@ export function TimelineChart({
       t.push(d * MINUTES_PER_DAY + half)
     }
     return t
+  }, [daysInMonth])
+
+  // Day boundary lines at midnight
+  const dayBoundaries = useMemo(() => {
+    const b: number[] = []
+    for (let d = 0; d <= daysInMonth; d++) {
+      b.push(d * MINUTES_PER_DAY)
+    }
+    return b
   }, [daysInMonth])
 
   const [tooltip, setTooltip] = useState<{
@@ -193,10 +203,17 @@ export function TimelineChart({
             layout="vertical"
             data={data}
             stackOffset="none"
-            margin={{ top: 10, right: 20, bottom: 10, left: 10 }}
+            margin={{ top: 10, right: 20, bottom: 10, left: hideYAxis ? 0 : 10 }}
             barCategoryGap="20%"
           >
-            <CartesianGrid vertical={true} horizontal={false} strokeDasharray="3 3" />
+            {dayBoundaries.map((min) => (
+              <ReferenceLine
+                key={`day-${min}`}
+                x={min}
+                stroke="var(--border)"
+                strokeDasharray="3 3"
+              />
+            ))}
             <XAxis
               type="number"
               domain={chartDomain}
@@ -210,7 +227,8 @@ export function TimelineChart({
             <YAxis
               type="category"
               dataKey="name"
-              width={180}
+              width={hideYAxis ? 0 : 180}
+              hide={hideYAxis}
               tickFormatter={(val: string) => (val.length > 20 ? val.slice(0, 18) + '...' : val)}
               axisLine={false}
               tickLine={false}

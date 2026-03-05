@@ -12,19 +12,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useCalendarStore, type CalendarEvent } from '@/store/calendar'
+import { useCalendarStore } from '@/store/calendar'
 
 type ZoomScale = '1w' | '2w' | '1m'
 
 const MINUTES_PER_DAY = 1440
-
-const CHART_COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-]
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April',
@@ -62,77 +54,55 @@ const MINI_W = 160
 const MINI_H = 28
 
 function MiniTimeline({
-  events,
   year,
   month,
-  domain,
   totalMinutes,
-  zoom,
-  maxOffset,
-  onOffsetChange,
+  scrollFraction,
+  visibleFraction,
+  onScrollTo,
 }: {
-  events: CalendarEvent[]
   year: number
   month: number
-  domain: [number, number]
   totalMinutes: number
-  zoom: ZoomScale
-  maxOffset: number
-  onOffsetChange: (offset: number) => void
+  scrollFraction: number
+  visibleFraction: number
+  onScrollTo: (fraction: number) => void
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const isDragging = useRef(false)
+  const dragStartX = useRef(0)
+  const dragStartFraction = useRef(0)
 
-  const monthStartMs = useMemo(() => new Date(year, month, 1).getTime(), [year, month])
-
-  const miniEvents = useMemo(() => {
-    const nameIndex = new Map<string, number>()
-    events.forEach((e) => {
-      const name = e.summary ?? '(no title)'
-      if (!nameIndex.has(name)) nameIndex.set(name, nameIndex.size)
-    })
-    return events.map((e) => {
-      const name = e.summary ?? '(no title)'
-      const startMin = Math.max(
-        0,
-        Math.round(
-          (new Date(e.start?.dateTime ?? e.start?.date ?? 0).getTime() - monthStartMs) / 60000,
-        ),
-      )
-      const rawEndMin = Math.round(
-        (new Date(e.end?.dateTime ?? e.end?.date ?? 0).getTime() - monthStartMs) / 60000,
-      )
-      const endMin = Math.min(totalMinutes, Math.max(startMin + 60, rawEndMin))
-      return { startMin, endMin, color: CHART_COLORS[(nameIndex.get(name) ?? 0) % CHART_COLORS.length] }
-    })
-  }, [events, monthStartMs, totalMinutes])
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const weeksCount = Math.ceil(daysInMonth / 7)
 
   const toX = (min: number) => (min / totalMinutes) * MINI_W
-  const viewX = toX(domain[0])
-  const viewW = Math.max(6, toX(domain[1]) - toX(domain[0]))
 
-  // Ref keeps handlers stable without re-registration
-  const stateRef = useRef({ totalMinutes, domain, maxOffset, zoom, onOffsetChange })
+  const viewW = Math.max(8, visibleFraction * MINI_W)
+  const maxViewX = MINI_W - viewW
+  const viewX = scrollFraction * maxViewX
+
+  // Stable ref for event handlers
+  const stateRef = useRef({ visibleFraction, onScrollTo })
   useEffect(() => {
-    stateRef.current = { totalMinutes, domain, maxOffset, zoom, onOffsetChange }
+    stateRef.current = { visibleFraction, onScrollTo }
   })
 
+  // Global mousemove/mouseup for drag
   useEffect(() => {
-    const calcOffset = (clientX: number): number => {
-      if (!svgRef.current) return 0
-      const { totalMinutes: total, domain: d, maxOffset: mo, zoom: z } = stateRef.current
-      const rect = svgRef.current.getBoundingClientRect()
-      const x = Math.max(0, Math.min(MINI_W, clientX - rect.left))
-      const windowMin = d[1] - d[0]
-      const targetStart = Math.max(0, (x / MINI_W) * total - windowMin / 2)
-      const stepMin = z === '1w' ? 7 * MINUTES_PER_DAY : 14 * MINUTES_PER_DAY
-      return Math.max(0, Math.min(mo, Math.round(targetStart / stepMin)))
-    }
     const onMove = (e: MouseEvent) => {
-      if (!isDragging.current || stateRef.current.zoom === '1m') return
-      stateRef.current.onOffsetChange(calcOffset(e.clientX))
+      if (!isDragging.current) return
+      const { visibleFraction: vf, onScrollTo: cb } = stateRef.current
+      const maxX = MINI_W * (1 - vf)
+      if (maxX <= 0) return
+      const dx = e.clientX - dragStartX.current
+      const dFraction = dx / maxX
+      const newFraction = Math.max(0, Math.min(1, dragStartFraction.current + dFraction))
+      cb(newFraction)
     }
-    const onUp = () => { isDragging.current = false }
+    const onUp = () => {
+      isDragging.current = false
+    }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
@@ -143,19 +113,47 @@ function MiniTimeline({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (zoom === '1m') return
-      isDragging.current = true
+      if (visibleFraction >= 1) return
+      e.preventDefault()
+
       if (!svgRef.current) return
       const rect = svgRef.current.getBoundingClientRect()
-      const x = Math.max(0, Math.min(MINI_W, e.clientX - rect.left))
-      const windowMin = domain[1] - domain[0]
-      const targetStart = Math.max(0, (x / MINI_W) * totalMinutes - windowMin / 2)
-      const stepMin = zoom === '1w' ? 7 * MINUTES_PER_DAY : 14 * MINUTES_PER_DAY
-      onOffsetChange(Math.max(0, Math.min(maxOffset, Math.round(targetStart / stepMin))))
-      e.preventDefault()
+      const x = e.clientX - rect.left
+
+      const clickInViewport = x >= viewX && x <= viewX + viewW
+
+      if (clickInViewport) {
+        isDragging.current = true
+        dragStartX.current = e.clientX
+        dragStartFraction.current = scrollFraction
+      } else {
+        // Jump: center viewport on click point
+        const clickNorm = x / MINI_W
+        const newFraction = Math.max(
+          0,
+          Math.min(1, (clickNorm - visibleFraction / 2) / (1 - visibleFraction)),
+        )
+        onScrollTo(newFraction)
+        isDragging.current = true
+        dragStartX.current = e.clientX
+        dragStartFraction.current = newFraction
+      }
     },
-    [zoom, domain, totalMinutes, maxOffset, onOffsetChange],
+    [visibleFraction, viewX, viewW, scrollFraction, onScrollTo],
   )
+
+  // Week blocks
+  const weekBlocks = useMemo(() => {
+    const blocks: { x: number; width: number }[] = []
+    for (let w = 0; w < weeksCount; w++) {
+      const weekStartMin = w * 7 * MINUTES_PER_DAY
+      const weekEndMin = Math.min(totalMinutes, (w + 1) * 7 * MINUTES_PER_DAY)
+      const x = toX(weekStartMin) + (w === 0 ? 6 : 2)
+      const x2 = toX(weekEndMin) - (w === weeksCount - 1 ? 6 : 2)
+      blocks.push({ x, width: x2 - x })
+    }
+    return blocks
+  }, [weeksCount, totalMinutes])
 
   return (
     <div className="select-none">
@@ -164,28 +162,35 @@ function MiniTimeline({
         width={MINI_W}
         height={MINI_H}
         onMouseDown={handleMouseDown}
-        className={zoom !== '1m' ? 'cursor-pointer' : ''}
+        className={visibleFraction < 1 ? 'cursor-grab active:cursor-grabbing' : ''}
         style={{ display: 'block' }}
       >
-        {/* Background */}
+        {/* 1. Background */}
         <rect width={MINI_W} height={MINI_H} rx={4} fill="var(--muted)" />
 
-        {/* Event bars */}
-        {miniEvents.map((ev, i) => {
-          const x = toX(ev.startMin)
-          const w = Math.max(2, toX(ev.endMin) - x)
-          return (
-            <rect key={i} x={x} y={8} width={w} height={12} rx={1} fill={ev.color} opacity={0.55} />
-          )
-        })}
+        {/* 2. Week blocks */}
+        {weekBlocks.map((block, i) => (
+          <rect
+            key={i}
+            x={block.x}
+            y={2}
+            width={block.width}
+            height={24}
+            rx={3}
+            fill="var(--muted-foreground)"
+            opacity={0.2}
+          />
+        ))}
 
-        {/* Viewport fill */}
-        <rect x={viewX} y={0} width={viewW} height={MINI_H} fill="var(--foreground)" opacity={0.1} rx={4} />
-        {/* Viewport border */}
+        {/* 3. Viewport overlay */}
         <rect
-          x={viewX + 0.5} y={0.5}
-          width={Math.max(1, viewW - 1)} height={MINI_H - 1}
-          fill="none" stroke="var(--foreground)" strokeWidth={1.5} opacity={0.4} rx={4}
+          x={viewX}
+          y={0}
+          width={viewW}
+          height={MINI_H}
+          fill="#6366f1"
+          opacity={0.15}
+          rx={4}
         />
       </svg>
     </div>
@@ -205,18 +210,21 @@ export function LlamaTimeTab() {
 
 
   const [zoom, setZoom] = useState<ZoomScale>('1m')
-  const [windowOffset, setWindowOffset] = useState(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollFraction, setScrollFraction] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
   const totalMinutes = daysInMonth * MINUTES_PER_DAY
 
   const zoomDays: Record<ZoomScale, number> = { '1w': 7, '2w': 14, '1m': daysInMonth }
-  const windowDays = zoomDays[zoom]
-  const maxOffset = Math.max(0, Math.ceil((daysInMonth - windowDays) / (zoom === '1w' ? 7 : 14)))
+  const visibleFraction = zoomDays[zoom] / daysInMonth
+  const chartWidthPercent = (daysInMonth / zoomDays[zoom]) * 100
 
-  const domainStart = windowOffset * (zoom === '1w' ? 7 : 14) * MINUTES_PER_DAY
-  const domainEnd = Math.min(domainStart + windowDays * MINUTES_PER_DAY, totalMinutes)
-  const domain: [number, number] = [domainStart, domainEnd]
+  const taskNames = useMemo(() => {
+    const names = new Set<string>()
+    for (const e of events) names.add(e.summary ?? '(no title)')
+    return Array.from(names).sort()
+  }, [events])
 
   const isConnected = status === 'connected' || status === 'done' || status === 'loading'
   const periodOptions = generatePeriodOptions()
@@ -227,8 +235,26 @@ export function LlamaTimeTab() {
     if (isConnected) fetchEvents()
   }, [selectedPeriod.year, selectedPeriod.month])
 
+  const handleChartScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setScrollFraction(maxScroll > 0 ? el.scrollLeft / maxScroll : 0)
+  }, [])
+
+  const handleScrollTo = useCallback((fraction: number) => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    el.scrollLeft = fraction * maxScroll
+  }, [])
+
   const handleZoomChange = (v: string) => {
-    if (v) { setZoom(v as ZoomScale); setWindowOffset(0) }
+    if (v) {
+      setZoom(v as ZoomScale)
+      setScrollFraction(0)
+      if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0
+    }
   }
 
   if (!isConnected) {
@@ -282,25 +308,48 @@ export function LlamaTimeTab() {
             </ToggleGroup>
 
             <MiniTimeline
-              events={events}
               year={selectedPeriod.year}
               month={selectedPeriod.month}
-              domain={domain}
               totalMinutes={totalMinutes}
-              zoom={zoom}
-              maxOffset={maxOffset}
-              onOffsetChange={setWindowOffset}
+              scrollFraction={scrollFraction}
+              visibleFraction={visibleFraction}
+              onScrollTo={handleScrollTo}
             />
           </div>
 
-          <CardContent className="overflow-x-auto p-0">
-            <div style={{ minWidth: `max(100%, ${daysInMonth * 80}px)` }}>
-              <TimelineChart
-                events={events}
-                year={selectedPeriod.year}
-                month={selectedPeriod.month}
-                domain={domain}
-              />
+          <CardContent className="flex p-0">
+            {/* Sticky labels column */}
+            <div
+              className="shrink-0 w-[180px] border-r bg-card z-10 flex flex-col"
+              style={{ height: Math.max(200, taskNames.length * 44 + 60) }}
+            >
+              <div style={{ height: 40, flexShrink: 0 }} />
+              <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
+                {taskNames.map((name) => (
+                  <div
+                    key={name}
+                    className="flex flex-1 items-center justify-start pl-3 text-sm text-muted-foreground truncate"
+                    title={name}
+                  >
+                    {name.length > 20 ? name.slice(0, 18) + '...' : name}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Scrollable chart */}
+            <div
+              ref={scrollContainerRef}
+              className="flex-1 overflow-x-auto"
+              onScroll={handleChartScroll}
+            >
+              <div style={{ minWidth: `${chartWidthPercent}%` }}>
+                <TimelineChart
+                  events={events}
+                  year={selectedPeriod.year}
+                  month={selectedPeriod.month}
+                  hideYAxis
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
