@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 224" width="160" height="224" shape-rendering="crispEdges">
+  <!-- 8-bit Pixel Art Alpaca — 20x28 grid, 8px per pixel -->
+  <!-- Palette: wool #F0EBE0, shadow #DDD5C5, pink #FF8FAA, blush #FFB3BA,
+       dark #333333, highlight #FFFFFF, nose #666666, hooves #7C5B3A -->
+
+  <!-- Row 0: Ear tips -->
+  <rect x="40" y="0" width="16" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="0" width="16" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 1: Ears -->
+  <rect x="32" y="8" width="32" height="8" fill="#F0EBE0"/>
+  <rect x="96" y="8" width="32" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 2: Ear inner pink -->
+  <rect x="32" y="16" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="40" y="16" width="16" height="8" fill="#FF8FAA"/>
+  <rect x="56" y="16" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="96" y="16" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="16" width="16" height="8" fill="#FF8FAA"/>
+  <rect x="120" y="16" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 3: Head connect -->
+  <rect x="32" y="24" width="96" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 4: Head with fluffy shadow edges -->
+  <rect x="24" y="32" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="32" y="32" width="96" height="8" fill="#F0EBE0"/>
+  <rect x="128" y="32" width="8" height="8" fill="#DDD5C5"/>
+
+  <!-- Row 5: Head wide -->
+  <rect x="16" y="40" width="128" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 6: Head -->
+  <rect x="16" y="48" width="128" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 7: Eyes top row (2x2 eyes) -->
+  <rect x="16" y="56" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="40" y="56" width="16" height="8" fill="#333333"/>
+  <rect x="56" y="56" width="48" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="56" width="16" height="8" fill="#333333"/>
+  <rect x="120" y="56" width="24" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 8: Eyes bottom row with highlights -->
+  <rect x="16" y="64" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="40" y="64" width="8" height="8" fill="#333333"/>
+  <rect x="48" y="64" width="8" height="8" fill="#FFFFFF"/>
+  <rect x="56" y="64" width="48" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="64" width="8" height="8" fill="#FFFFFF"/>
+  <rect x="112" y="64" width="8" height="8" fill="#333333"/>
+  <rect x="120" y="64" width="24" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 9: Below eyes -->
+  <rect x="16" y="72" width="128" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 10: Blush cheeks -->
+  <rect x="24" y="80" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="32" y="80" width="8" height="8" fill="#FFB3BA"/>
+  <rect x="40" y="80" width="80" height="8" fill="#F0EBE0"/>
+  <rect x="120" y="80" width="8" height="8" fill="#FFB3BA"/>
+  <rect x="128" y="80" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 11: Nose -->
+  <rect x="24" y="88" width="48" height="8" fill="#F0EBE0"/>
+  <rect x="72" y="88" width="16" height="8" fill="#666666"/>
+  <rect x="88" y="88" width="48" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 12: Below nose / mouth -->
+  <rect x="32" y="96" width="96" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 13: Chin -->
+  <rect x="40" y="104" width="80" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 14: Neck top -->
+  <rect x="48" y="112" width="64" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 15: Neck with wool texture -->
+  <rect x="48" y="120" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="56" y="120" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="64" y="120" width="32" height="8" fill="#F0EBE0"/>
+  <rect x="96" y="120" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="104" y="120" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 16: Neck -->
+  <rect x="48" y="128" width="64" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 17: Body top -->
+  <rect x="40" y="136" width="80" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 18: Body expanding with shadow edges -->
+  <rect x="32" y="144" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="40" y="144" width="80" height="8" fill="#F0EBE0"/>
+  <rect x="120" y="144" width="8" height="8" fill="#DDD5C5"/>
+
+  <!-- Row 19: Body -->
+  <rect x="24" y="152" width="112" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 20: Body widest with wool texture -->
+  <rect x="16" y="160" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="24" y="160" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="32" y="160" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="56" y="160" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="64" y="160" width="32" height="8" fill="#F0EBE0"/>
+  <rect x="96" y="160" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="104" y="160" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="128" y="160" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="136" y="160" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 21: Body -->
+  <rect x="16" y="168" width="128" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 22: Body lower with texture -->
+  <rect x="24" y="176" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="32" y="176" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="40" y="176" width="80" height="8" fill="#F0EBE0"/>
+  <rect x="120" y="176" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="128" y="176" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 23: Legs top -->
+  <rect x="32" y="184" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="184" width="24" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 24: Legs -->
+  <rect x="32" y="192" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="192" width="24" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 25: Legs with shadow -->
+  <rect x="32" y="200" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="40" y="200" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="48" y="200" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="200" width="8" height="8" fill="#F0EBE0"/>
+  <rect x="112" y="200" width="8" height="8" fill="#DDD5C5"/>
+  <rect x="120" y="200" width="8" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 26: Legs -->
+  <rect x="32" y="208" width="24" height="8" fill="#F0EBE0"/>
+  <rect x="104" y="208" width="24" height="8" fill="#F0EBE0"/>
+
+  <!-- Row 27: Hooves -->
+  <rect x="32" y="216" width="24" height="8" fill="#7C5B3A"/>
+  <rect x="104" y="216" width="24" height="8" fill="#7C5B3A"/>
+</svg>

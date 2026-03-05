@@ -1,5 +1,6 @@
 import { AppHeader } from '@/components/AppHeader'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
+import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppStore } from '@/store/app'
 
@@ -78,9 +79,7 @@ function App() {
           </div>
           </div>
         )}
-        {activeTab === 'wool-insights' && (
-          <div className="text-muted-foreground text-sm">Wool Insights content</div>
-        )}
+        {activeTab === 'wool-insights' && <WoolInsightsTab />}
         {activeTab === 'logs-history' && (
           <div className="text-muted-foreground text-sm">Logs History content</div>
         )}

@@ -1,0 +1,49 @@
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+const chartConfig = {
+  hours: {
+    label: 'Hours',
+    color: 'var(--chart-1)',
+  },
+} satisfies ChartConfig
+
+interface Props {
+  data: { project: string; hours: number }[]
+  periodLabel: string
+}
+
+export function ProjectsBarChart({ data, periodLabel }: Props) {
+  return (
+    <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
+      <CardHeader className="shrink-0 px-4 py-3">
+        <CardTitle>Hours by Project</CardTitle>
+        <CardDescription>{periodLabel}</CardDescription>
+      </CardHeader>
+      <CardContent className="min-h-0 flex-1 px-2 pb-2">
+        <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
+          <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16 }}>
+            <CartesianGrid horizontal={false} />
+            <YAxis
+              dataKey="project"
+              type="category"
+              tickLine={false}
+              axisLine={false}
+              width={70}
+              tick={{ fontSize: 12 }}
+            />
+            <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="hours" fill="var(--color-hours)" radius={[0, 4, 4, 0]} />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
+}

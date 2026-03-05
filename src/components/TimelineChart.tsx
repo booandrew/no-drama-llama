@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Bar, BarChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
@@ -156,8 +157,8 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
 
   const [tooltip, setTooltip] = useState<{
     meta: SegmentMeta
-    x: number
-    y: number
+    clientX: number
+    clientY: number
   } | null>(null)
 
   const [selectedMeta, setSelectedMeta] = useState<SegmentMeta | null>(null)
@@ -261,15 +262,10 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
                       onMouseEnter={(e) => {
                         if (!meta) return
                         const svgRect = (e.currentTarget as SVGRectElement).getBoundingClientRect()
-                        const chartEl = (e.currentTarget as SVGRectElement).closest(
-                          '[data-slot="chart"]',
-                        )
-                        if (!chartEl) return
-                        const containerRect = chartEl.getBoundingClientRect()
                         setTooltip({
                           meta,
-                          x: svgRect.left - containerRect.left + svgRect.width / 2,
-                          y: svgRect.top - containerRect.top,
+                          clientX: svgRect.left + svgRect.width / 2,
+                          clientY: svgRect.top,
                         })
                       }}
                       onMouseLeave={() => setTooltip(null)}
@@ -288,10 +284,13 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
           </BarChart>
         </ChartContainer>
 
-        {tooltip && (
+      </div>
+
+      {tooltip &&
+        createPortal(
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border bg-background px-3 py-2 text-sm shadow-md"
-            style={{ left: tooltip.x, top: tooltip.y - 4 }}
+            className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg border bg-background px-3 py-2 text-sm shadow-md"
+            style={{ left: tooltip.clientX, top: tooltip.clientY - 4 }}
           >
             <p className="font-medium">{tooltip.meta.name}</p>
             <p className="text-muted-foreground">
@@ -309,9 +308,9 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
               })}
             </p>
             <p className="text-muted-foreground">{formatDuration(tooltip.meta.durationMin)}</p>
-          </div>
+          </div>,
+          document.body,
         )}
-      </div>
 
       <Dialog
         open={!!selectedMeta}
