@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
 import { GanttChart } from '@/components/GanttChart'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -10,7 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useCalendarStore } from '@/store/calendar'
+// import { useJiraStore } from '@/store/jira'
+
+type ZoomScale = '1w' | '2w' | '1m'
+
+const FIXED_DAY_WIDTH: Record<ZoomScale, number | null> = {
+  '1w': 140,
+  '2w': 70,
+  '1m': null, // auto-fill container
+}
+
+const MIN_DAY_WIDTH = 32
+const GANTT_MARGIN_LR = 180 + 20 // MARGIN.left + MARGIN.right from GanttChart
 
 const MONTH_NAMES = [
   'January',
@@ -58,6 +72,22 @@ export function PacaTimeTab() {
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
 
+  const [zoom, setZoom] = useState<ZoomScale>('1m')
+  const [containerWidth, setContainerWidth] = useState(0)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentBoxSize[0].inlineSize))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
+  const fixedWidth = FIXED_DAY_WIDTH[zoom]
+  const dayWidth = fixedWidth ?? Math.max(MIN_DAY_WIDTH, (containerWidth - GANTT_MARGIN_LR) / daysInMonth)
+
   const isConnected = status === 'connected' || status === 'done' || status === 'loading'
   const periodOptions = generatePeriodOptions()
   const isInitialMount = useRef(true)
@@ -89,7 +119,7 @@ export function PacaTimeTab() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={wrapperRef} className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <Select
           value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
@@ -110,10 +140,23 @@ export function PacaTimeTab() {
           </SelectContent>
         </Select>
 
-        <Button variant="default" size="sm" onClick={handleRefresh} disabled={eventsLoading}>
-          <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
-          Refresh Google Calendar
-        </Button>
+        <div className="flex items-center gap-2">
+          <ToggleGroup
+            type="single"
+            value={zoom}
+            onValueChange={(v) => v && setZoom(v as ZoomScale)}
+            size="sm"
+          >
+            <ToggleGroupItem value="1w">1W</ToggleGroupItem>
+            <ToggleGroupItem value="2w">2W</ToggleGroupItem>
+            <ToggleGroupItem value="1m">1M</ToggleGroupItem>
+          </ToggleGroup>
+
+          <Button variant="default" size="sm" onClick={handleRefresh} disabled={eventsLoading}>
+            <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
+            Refresh Google Calendar
+          </Button>
+        </div>
       </div>
 
       {events.length === 0 && !eventsLoading && (
@@ -123,12 +166,18 @@ export function PacaTimeTab() {
       )}
 
       {events.length > 0 && (
-        <GanttChart
-          events={events}
-          year={selectedPeriod.year}
-          month={selectedPeriod.month}
-        />
+        <Card>
+          <CardContent className="overflow-x-auto p-0">
+            <GanttChart
+              events={events}
+              year={selectedPeriod.year}
+              month={selectedPeriod.month}
+              dayWidth={dayWidth}
+            />
+          </CardContent>
+        </Card>
       )}
+
     </div>
   )
 }

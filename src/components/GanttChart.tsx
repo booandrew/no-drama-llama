@@ -27,14 +27,17 @@ const CHART_COLORS = [
 const MARGIN = { top: 30, right: 20, bottom: 20, left: 180 }
 const ROW_HEIGHT = 36
 const BAR_HEIGHT = 22
+const DAY_START_HOUR = 6
+const VISIBLE_HOURS = 18 // 6:00 to 00:00
 
 interface GanttChartProps {
   events: CalendarEvent[]
   year: number
   month: number
+  dayWidth?: number
 }
 
-export function GanttChart({ events, year, month }: GanttChartProps) {
+export function GanttChart({ events, year, month, dayWidth = 32 }: GanttChartProps) {
   const axesRef = useRef<SVGGElement>(null)
 
   const { taskNames, width, height, bars } = useMemo(() => {
@@ -45,13 +48,18 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
     const grouped = d3.group(events, (e) => e.summary ?? '(no title)')
     const taskNames = Array.from(grouped.keys()).sort()
 
-    const width = MARGIN.left + MARGIN.right + daysInMonth * 32
+    const width = MARGIN.left + MARGIN.right + daysInMonth * dayWidth
     const height = MARGIN.top + MARGIN.bottom + taskNames.length * ROW_HEIGHT
 
-    const xScale = d3
-      .scaleTime()
-      .domain([timeMin, timeMax])
-      .range([MARGIN.left, width - MARGIN.right])
+    function timeToX(date: Date): number {
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      const dayIndex = Math.round(
+        (dayStart.getTime() - timeMin.getTime()) / (24 * 60 * 60 * 1000),
+      )
+      const hours = date.getHours() + date.getMinutes() / 60
+      const progress = Math.max(0, Math.min(1, (hours - DAY_START_HOUR) / VISIBLE_HOURS))
+      return MARGIN.left + dayIndex * dayWidth + progress * dayWidth
+    }
 
     const yScale = d3
       .scaleBand<string>()
@@ -75,8 +83,8 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
         const clampedStart = start < timeMin ? timeMin : start
         const clampedEnd = end > timeMax ? timeMax : end
 
-        const x = xScale(clampedStart)
-        const barWidth = Math.max(xScale(clampedEnd) - x, 4)
+        const x = timeToX(clampedStart)
+        const barWidth = Math.max(timeToX(clampedEnd) - x, 4)
         const y = yScale(name)
         if (y === undefined) return null
         const barY = y + (yScale.bandwidth() - BAR_HEIGHT) / 2
@@ -111,7 +119,7 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
       .filter((b) => b !== null)
 
     return { taskNames, width, height, bars }
-  }, [events, year, month])
+  }, [events, year, month, dayWidth])
 
   // D3 renders axes, grid, and today marker
   useEffect(() => {
@@ -124,10 +132,15 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
     const timeMax = new Date(year, month + 1, 1)
     const daysInMonth = new Date(year, month + 1, 0).getDate()
 
-    const xScale = d3
-      .scaleTime()
-      .domain([timeMin, timeMax])
-      .range([MARGIN.left, width - MARGIN.right])
+    function timeToX(date: Date): number {
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      const dayIndex = Math.round(
+        (dayStart.getTime() - timeMin.getTime()) / (24 * 60 * 60 * 1000),
+      )
+      const hours = date.getHours() + date.getMinutes() / 60
+      const progress = Math.max(0, Math.min(1, (hours - DAY_START_HOUR) / VISIBLE_HOURS))
+      return MARGIN.left + dayIndex * dayWidth + progress * dayWidth
+    }
 
     const yScale = d3
       .scaleBand<string>()
@@ -137,7 +150,7 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
 
     // Vertical grid lines (one per day)
     for (let day = 1; day <= daysInMonth; day++) {
-      const x = xScale(new Date(year, month, day))
+      const x = MARGIN.left + (day - 1) * dayWidth
       g.append('line')
         .attr('x1', x)
         .attr('x2', x)
@@ -160,22 +173,24 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
     }
 
     // X axis (day numbers)
-    const xAxis = d3
-      .axisTop(xScale)
-      .ticks(d3.timeDay.every(1))
-      .tickFormat((d) => d3.timeFormat('%-d')(d as Date))
+    for (let day = 1; day <= daysInMonth; day++) {
+      const x = MARGIN.left + (day - 1) * dayWidth + dayWidth / 2
+      g.append('text')
+        .attr('x', x)
+        .attr('y', MARGIN.top - 8)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'var(--muted-foreground)')
+        .attr('font-size', '11px')
+        .text(day)
 
-    g.append('g')
-      .attr('transform', `translate(0,${MARGIN.top})`)
-      .call(xAxis)
-      .call((sel) => sel.select('.domain').remove())
-      .call((sel) =>
-        sel
-          .selectAll('.tick text')
-          .attr('fill', 'var(--muted-foreground)')
-          .attr('font-size', '11px'),
-      )
-      .call((sel) => sel.selectAll('.tick line').attr('stroke', 'var(--border)'))
+      // Tick line
+      g.append('line')
+        .attr('x1', MARGIN.left + (day - 1) * dayWidth)
+        .attr('x2', MARGIN.left + (day - 1) * dayWidth)
+        .attr('y1', MARGIN.top - 4)
+        .attr('y2', MARGIN.top)
+        .attr('stroke', 'var(--border)')
+    }
 
     // Y axis (task names)
     const yAxis = d3.axisLeft(yScale)
@@ -202,7 +217,7 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
     // Today marker
     const today = new Date()
     if (today >= timeMin && today < timeMax) {
-      const todayX = xScale(today)
+      const todayX = timeToX(today)
       g.append('line')
         .attr('x1', todayX)
         .attr('x2', todayX)
@@ -212,7 +227,7 @@ export function GanttChart({ events, year, month }: GanttChartProps) {
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '4,3')
     }
-  }, [year, month, taskNames, width, height])
+  }, [year, month, taskNames, width, height, dayWidth])
 
   if (taskNames.length === 0) return null
 

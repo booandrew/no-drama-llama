@@ -16,4 +16,13 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@duckdb/duckdb-wasm'],
   },
+  server: {
+    proxy: {
+      '/jira-api': {
+        target: 'https://api.atlassian.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/jira-api/, ''),
+      },
+    },
+  },
 })
