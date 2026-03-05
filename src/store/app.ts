@@ -38,7 +38,7 @@ export const useAppStore = create<AppState>()(
             i.id === id ? { ...i, connected: !i.connected } : i,
           ),
         })),
-      isMockMode: true,
+      isMockMode: false,
       toggleMockMode: () => set((state) => ({ isMockMode: !state.isMockMode })),
     }),
     {

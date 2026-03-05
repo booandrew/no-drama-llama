@@ -41,28 +41,8 @@ const MONTH_NAMES = [
   'December',
 ]
 
-function generatePeriodOptions() {
-  const now = new Date()
-  const options: { year: number; month: number; label: string }[] = []
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    options.push({
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`,
-    })
-  }
-  return options
-}
-
-function periodToValue(year: number, month: number) {
-  return `${year}-${month}`
-}
-
-function valueToPeriod(value: string) {
-  const [year, month] = value.split('-').map(Number)
-  return { year, month }
-}
+const currentYear = new Date().getFullYear()
+const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
 // ---------------------------------------------------------------------------
 // MiniTimeline — horizontal compressed overview with draggable viewport
@@ -212,30 +192,48 @@ export function LlamaTimeToolbar() {
   const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
-  const { isConnected, connect } = useGoogleCalendarConnect()
-  const periodOptions = generatePeriodOptions()
+  const { isConnected } = useGoogleCalendarConnect()
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Select
-          value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
-          onValueChange={(v) => setSelectedPeriod(valueToPeriod(v))}
-        >
-          <SelectTrigger className="w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {periodOptions.map((opt) => (
-              <SelectItem
-                key={periodToValue(opt.year, opt.month)}
-                value={periodToValue(opt.year, opt.month)}
-              >
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select
+            value={String(selectedPeriod.month)}
+            onValueChange={(v) =>
+              setSelectedPeriod({ year: selectedPeriod.year, month: Number(v) })
+            }
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTH_NAMES.map((name, i) => (
+                <SelectItem key={i} value={String(i)}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={String(selectedPeriod.year)}
+            onValueChange={(v) =>
+              setSelectedPeriod({ year: Number(v), month: selectedPeriod.month })
+            }
+          >
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex items-center gap-2">
           {isMockMode ? (
@@ -244,12 +242,7 @@ export function LlamaTimeToolbar() {
             <Button variant="default" size="sm" disabled>
               I'm good with timelogs, Submit to JIRA
             </Button>
-          ) : (
-            <Button variant="default" size="sm" onClick={connect}>
-              <Calendar className="size-4" />
-              Connect Google Calendar
-            </Button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -279,6 +272,7 @@ export function LlamaTimeTab() {
   const eventsLoading = useCalendarStore((s) => s.eventsLoading)
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
+  const { connect } = useGoogleCalendarConnect()
 
   const events = isMockMode
     ? mockEventsForPeriod(selectedPeriod.year, selectedPeriod.month)
@@ -304,6 +298,16 @@ export function LlamaTimeTab() {
 
   const isConnected =
     isMockMode || status === 'connected' || status === 'done' || status === 'loading'
+  const prevConnected = useRef(isConnected)
+
+  useEffect(() => {
+    if (isMockMode) return
+    if (!prevConnected.current && isConnected) {
+      fetchEvents()
+    }
+    prevConnected.current = isConnected
+  }, [isConnected])
+
   const isInitialMount = useRef(true)
 
   useEffect(() => {
@@ -379,9 +383,12 @@ export function LlamaTimeTab() {
 
   if (!isConnected) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Connect Google Calendar in Integrations to see events.
-      </p>
+      <div className="flex flex-1 items-center justify-center">
+        <Button variant="default" size="lg" onClick={connect}>
+          <Calendar className="size-5" />
+          Connect Google Calendar
+        </Button>
+      </div>
     )
   }
 
