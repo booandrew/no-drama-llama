@@ -9,7 +9,6 @@ interface Integration {
 }
 
 const defaultIntegrations: Integration[] = [
-  { id: 'jira', name: 'Jira', connected: false },
   { id: 'git', name: 'Git', connected: false },
 ]
 

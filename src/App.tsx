@@ -1,11 +1,34 @@
+import { useEffect } from 'react'
+
 import { AppHeader } from '@/components/AppHeader'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppStore } from '@/store/app'
+import { useJiraStore } from '@/store/jira'
+
+function useJiraOAuthCallback() {
+  const exchangeCode = useJiraStore((s) => s.exchangeCode)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    const savedState = sessionStorage.getItem('jira_oauth_state')
+
+    if (!code || !state || state !== savedState) return
+
+    sessionStorage.removeItem('jira_oauth_state')
+    // Clean URL params
+    window.history.replaceState({}, '', window.location.pathname)
+
+    exchangeCode(code)
+  }, [exchangeCode])
+}
 
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
+  useJiraOAuthCallback()
 
   return (
     <div className="flex min-h-svh flex-col">

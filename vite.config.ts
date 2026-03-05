@@ -23,6 +23,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/jira-api/, ''),
       },
+      '/jira-auth': {
+        target: 'https://auth.atlassian.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/jira-auth/, ''),
+      },
     },
   },
 })

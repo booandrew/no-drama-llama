@@ -1,14 +1,26 @@
-const CLOUD_ID = import.meta.env.VITE_JIRA_CLOUD_ID
-const EMAIL = import.meta.env.VITE_JIRA_EMAIL
-const TOKEN = import.meta.env.VITE_JIRA_TOKEN
+import { useJiraStore } from '@/store/jira'
 
-const BASE = `/jira-api/ex/jira/${CLOUD_ID}/rest/api/3`
+function getBase() {
+  const { cloudId } = useJiraStore.getState()
+  if (!cloudId) throw new Error('Jira not connected: no cloudId')
+  return `/jira-api/ex/jira/${cloudId}/rest/api/3`
+}
 
 function headers() {
+  const { accessToken } = useJiraStore.getState()
+  if (!accessToken) throw new Error('Jira not connected: no access token')
   return {
-    Authorization: `Basic ${btoa(`${EMAIL}:${TOKEN}`)}`,
+    Authorization: `Bearer ${accessToken}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
+  }
+}
+
+async function ensureValidToken() {
+  const store = useJiraStore.getState()
+  if (!store.isTokenValid()) {
+    const refreshed = await store.refreshAccessToken()
+    if (!refreshed) throw new Error('Jira token expired and refresh failed')
   }
 }
 
@@ -28,9 +40,14 @@ export interface JiraIssue {
 }
 
 export async function fetchProjects(): Promise<JiraProject[]> {
-  const res = await fetch(`${BASE}/project/search?maxResults=50`, {
+  await ensureValidToken()
+  const res = await fetch(`${getBase()}/project/search?maxResults=50`, {
     headers: headers(),
   })
+  if (res.status === 401) {
+    useJiraStore.getState().setExpired()
+    throw new Error('Jira token expired')
+  }
   if (!res.ok) throw new Error(`Jira projects: ${res.status}`)
   const data = await res.json()
   return data.values.map((p: { id: string; key: string; name: string }) => ({
@@ -42,6 +59,7 @@ export async function fetchProjects(): Promise<JiraProject[]> {
 
 export async function fetchIssues(projectKeys: string[]): Promise<JiraIssue[]> {
   if (projectKeys.length === 0) return []
+  await ensureValidToken()
   const quoted = projectKeys.map((k) => `"${k}"`).join(', ')
   const jql = `project in (${quoted}) ORDER BY key ASC`
   const params = new URLSearchParams({
@@ -49,9 +67,13 @@ export async function fetchIssues(projectKeys: string[]): Promise<JiraIssue[]> {
     fields: 'summary,status,project',
     maxResults: '200',
   })
-  const res = await fetch(`${BASE}/search/jql?${params}`, {
+  const res = await fetch(`${getBase()}/search/jql?${params}`, {
     headers: headers(),
   })
+  if (res.status === 401) {
+    useJiraStore.getState().setExpired()
+    throw new Error('Jira token expired')
+  }
   if (!res.ok) throw new Error(`Jira issues: ${res.status}`)
   const data = await res.json()
   return data.issues.map(

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type CalendarStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
+export type CalendarAuthMethod = 'org' | 'personal'
 
 export interface CalendarEvent {
   id: string
@@ -29,11 +30,14 @@ interface CalendarState {
   status: CalendarStatus
   accessToken: string | null
   expiresAt: number | null
+  authMethod: CalendarAuthMethod | null
+  personalClientId: string | null
   selectedPeriod: Period
   events: CalendarEvent[]
   eventsLoading: boolean
 
-  setConnected: (accessToken: string, expiresIn: number) => void
+  setConnected: (accessToken: string, expiresIn: number, method: CalendarAuthMethod) => void
+  setPersonalClientId: (clientId: string) => void
   setStatus: (status: CalendarStatus) => void
   setExpired: () => void
   disconnect: () => void
@@ -48,16 +52,21 @@ export const useCalendarStore = create<CalendarState>()(
       status: 'idle',
       accessToken: null,
       expiresAt: null,
+      authMethod: null,
+      personalClientId: null,
       selectedPeriod: currentPeriod(),
       events: [],
       eventsLoading: false,
 
-      setConnected: (accessToken, expiresIn) =>
+      setConnected: (accessToken, expiresIn, method) =>
         set({
           accessToken,
           expiresAt: Date.now() + expiresIn * 1000,
+          authMethod: method,
           status: 'connected',
         }),
+
+      setPersonalClientId: (clientId) => set({ personalClientId: clientId }),
 
       setStatus: (status) => set({ status }),
 
@@ -72,6 +81,8 @@ export const useCalendarStore = create<CalendarState>()(
         set({
           accessToken: null,
           expiresAt: null,
+          authMethod: null,
+          personalClientId: null,
           status: 'idle',
           events: [],
         }),
@@ -138,8 +149,18 @@ export const useCalendarStore = create<CalendarState>()(
       partialize: (state) => ({
         accessToken: state.accessToken,
         expiresAt: state.expiresAt,
+        authMethod: state.authMethod,
+        personalClientId: state.personalClientId,
         selectedPeriod: state.selectedPeriod,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state?.accessToken) return
+        if (state.isTokenValid()) {
+          state.setStatus('connected')
+        } else {
+          state.setExpired()
+        }
+      },
     },
   ),
 )
