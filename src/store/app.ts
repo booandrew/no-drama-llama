@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Tab = 'llama-time' | 'wool-insights' | 'logs-history'
+type Tab = 'llama-time' | 'sources' | 'custom-inputs' | 'mappings' | 'wool-insights' | 'logs-history'
 
 interface Integration {
   id: string

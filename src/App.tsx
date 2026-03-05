@@ -1,34 +1,42 @@
 import { useEffect } from 'react'
 
 import { AppHeader } from '@/components/AppHeader'
+import { CustomInputsTab } from '@/components/CustomInputsTab'
+import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
+import { SourcesTab } from '@/components/SourcesTab'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppStore } from '@/store/app'
 import { useJiraStore } from '@/store/jira'
 
-function useJiraOAuthCallback() {
-  const exchangeCode = useJiraStore((s) => s.exchangeCode)
-
+function useOAuthCallback(
+  sessionKey: string,
+  exchangeCode: (code: string) => Promise<void>,
+  isRehydrated: boolean,
+) {
   useEffect(() => {
+    if (!isRehydrated) return
+
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     const state = params.get('state')
-    const savedState = sessionStorage.getItem('jira_oauth_state')
+    const savedState = sessionStorage.getItem(sessionKey)
 
     if (!code || !state || state !== savedState) return
 
-    sessionStorage.removeItem('jira_oauth_state')
-    // Clean URL params
+    sessionStorage.removeItem(sessionKey)
     window.history.replaceState({}, '', window.location.pathname)
 
     exchangeCode(code)
-  }, [exchangeCode])
+  }, [sessionKey, exchangeCode, isRehydrated])
 }
 
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
-  useJiraOAuthCallback()
+  const jiraExchangeCode = useJiraStore((s) => s.exchangeCode)
+  const jiraHydrated = useJiraStore((s) => s._hasHydrated)
+  useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
 
   return (
     <div className="flex min-h-svh flex-col">

@@ -127,6 +127,7 @@ export const useCalendarStore = create<CalendarState>()(
             if (!res.ok) {
               if (res.status === 401) {
                 setExpired()
+                set({ eventsLoading: false })
                 return
               }
               throw new Error(`Calendar API error: ${res.status}`)

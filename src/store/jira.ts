@@ -1,28 +1,37 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import { fetchIssues, fetchProjects } from '@/lib/jira'
-import type { JiraIssue, JiraProject } from '@/lib/jira'
+import { fetchIssues } from '@/lib/jira'
+import type { JiraIssue } from '@/lib/jira'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
+export type JiraAuthMethod = 'oauth' | 'token'
 
-const JIRA_SCOPES = 'read:jira-work offline_access'
+const JIRA_SCOPES = 'read:jira-work read:me offline_access'
 const REDIRECT_URI = () => window.location.origin
 
 interface JiraState {
   status: JiraStatus
+  authMethod: JiraAuthMethod
   clientId: string | null
   clientSecret: string | null
   accessToken: string | null
   refreshToken: string | null
   expiresAt: number | null
   cloudId: string | null
+  accountId: string | null
 
-  projects: JiraProject[]
+  // API token auth fields
+  siteUrl: string | null
+  email: string | null
+  apiToken: string | null
+
   issues: JiraIssue[]
   loading: boolean
   error: string | null
 
+  _hasHydrated: boolean
+  setHydrated: () => void
   setCredentials: (clientId: string, clientSecret: string) => void
   setStatus: (status: JiraStatus) => void
   disconnect: () => void
@@ -31,6 +40,7 @@ interface JiraState {
   exchangeCode: (code: string) => Promise<void>
   refreshAccessToken: () => Promise<boolean>
   startOAuth: () => void
+  connectWithToken: (siteUrl: string, email: string, apiToken: string) => Promise<void>
   loadAll: () => Promise<void>
 }
 
@@ -38,14 +48,22 @@ export const useJiraStore = create<JiraState>()(
   persist(
     (set, get) => ({
       status: 'idle',
+      authMethod: 'oauth',
       clientId: null,
       clientSecret: null,
       accessToken: null,
       refreshToken: null,
       expiresAt: null,
       cloudId: null,
+      accountId: null,
 
-      projects: [],
+      siteUrl: null,
+      email: null,
+      apiToken: null,
+
+      _hasHydrated: false,
+      setHydrated: () => set({ _hasHydrated: true }),
+
       issues: [],
       loading: false,
       error: null,
@@ -56,18 +74,23 @@ export const useJiraStore = create<JiraState>()(
 
       disconnect: () =>
         set({
+          authMethod: 'oauth',
           accessToken: null,
           refreshToken: null,
           expiresAt: null,
           cloudId: null,
+          accountId: null,
+          siteUrl: null,
+          email: null,
+          apiToken: null,
           status: 'idle',
-          projects: [],
           issues: [],
           error: null,
         }),
 
       isTokenValid: () => {
-        const { expiresAt } = get()
+        const { authMethod, expiresAt } = get()
+        if (authMethod === 'token') return true
         if (!expiresAt) return false
         return expiresAt > Date.now() + 60_000
       },
@@ -141,11 +164,21 @@ export const useJiraStore = create<JiraState>()(
 
           const cloudId = resources[0].id
 
+          // Fetch current user's accountId (currentUser() doesn't work with OAuth 2.0 3LO)
+          const meRes = await fetch('/jira-api/me', {
+            headers: { Authorization: `Bearer ${access_token}`, Accept: 'application/json' },
+          })
+          if (!meRes.ok) {
+            throw new Error(`Failed to fetch Jira user: ${meRes.status}`)
+          }
+          const me = await meRes.json()
+
           set({
             accessToken: access_token,
             refreshToken: refresh_token,
             expiresAt: Date.now() + expires_in * 1000,
             cloudId,
+            accountId: me.account_id,
             status: 'connected',
             error: null,
           })
@@ -193,6 +226,37 @@ export const useJiraStore = create<JiraState>()(
         }
       },
 
+      connectWithToken: async (siteUrl, email, apiToken) => {
+        set({ status: 'loading', error: null })
+        try {
+          const basicAuth = btoa(`${email}:${apiToken}`)
+          const res = await fetch(`/jira-site/rest/api/3/myself`, {
+            headers: {
+              Authorization: `Basic ${basicAuth}`,
+              Accept: 'application/json',
+              'X-Jira-Host': siteUrl,
+            },
+          })
+          if (!res.ok) {
+            const text = await res.text()
+            throw new Error(`Auth failed: ${res.status} ${text}`)
+          }
+          const me = await res.json()
+          set({
+            authMethod: 'token',
+            siteUrl,
+            email,
+            apiToken,
+            accountId: me.accountId,
+            status: 'connected',
+            error: null,
+          })
+        } catch (e) {
+          console.error('[Jira] API token connect failed:', e)
+          set({ status: 'error', error: (e as Error).message })
+        }
+      },
+
       loadAll: async () => {
         const { isTokenValid, refreshAccessToken, setExpired } = get()
 
@@ -206,9 +270,8 @@ export const useJiraStore = create<JiraState>()(
 
         set({ loading: true, error: null })
         try {
-          const projects = await fetchProjects()
-          const issues = await fetchIssues(projects.map((p) => p.key))
-          set({ projects, issues, loading: false })
+          const issues = await fetchIssues()
+          set({ issues, loading: false })
         } catch (e) {
           set({ error: (e as Error).message, loading: false })
         }
@@ -217,14 +280,26 @@ export const useJiraStore = create<JiraState>()(
     {
       name: 'jira-storage',
       partialize: (state) => ({
+        authMethod: state.authMethod,
         clientId: state.clientId,
         clientSecret: state.clientSecret,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         expiresAt: state.expiresAt,
         cloudId: state.cloudId,
+        accountId: state.accountId,
+        siteUrl: state.siteUrl,
+        email: state.email,
+        apiToken: state.apiToken,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) state?.setHydrated()
+        if (state?.authMethod === 'token') {
+          if (state.apiToken && state.email && state.siteUrl) {
+            state.setStatus('connected')
+          }
+          return
+        }
         if (!state?.accessToken) return
         if (state.isTokenValid()) {
           state.setStatus('connected')

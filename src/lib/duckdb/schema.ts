@@ -58,6 +58,32 @@ export async function runSchema(conn: AsyncDuckDBConnection): Promise<void> {
 
   await exec(
     conn,
+    `CREATE TABLE IF NOT EXISTS src_tempo_workload_days (
+      scheme_id VARCHAR NOT NULL,
+      scheme_name VARCHAR,
+      day INTEGER NOT NULL,
+      required_seconds INTEGER NOT NULL,
+      loaded_at TIMESTAMP DEFAULT current_timestamp,
+      PRIMARY KEY (scheme_id, day)
+    )`,
+  )
+
+  await exec(
+    conn,
+    `CREATE TABLE IF NOT EXISTS src_tempo_holidays (
+      scheme_id VARCHAR NOT NULL,
+      holiday_id VARCHAR NOT NULL,
+      name VARCHAR NOT NULL,
+      date DATE NOT NULL,
+      duration_seconds INTEGER NOT NULL,
+      type VARCHAR NOT NULL,
+      loaded_at TIMESTAMP DEFAULT current_timestamp,
+      PRIMARY KEY (scheme_id, holiday_id)
+    )`,
+  )
+
+  await exec(
+    conn,
     `CREATE TABLE IF NOT EXISTS src_calendar_events (
       id VARCHAR NOT NULL,
       iCalUID VARCHAR,
@@ -106,6 +132,17 @@ export async function runSchema(conn: AsyncDuckDBConnection): Promise<void> {
       summary VARCHAR,
       description VARCHAR,
       link VARCHAR
+    )`,
+  )
+
+  await exec(
+    conn,
+    `CREATE TABLE IF NOT EXISTS dds_tempo_daily_capacity (
+      date DATE PRIMARY KEY,
+      day_of_week INTEGER NOT NULL,
+      required_seconds INTEGER NOT NULL,
+      is_holiday BOOLEAN DEFAULT false,
+      holiday_name VARCHAR
     )`,
   )
 
