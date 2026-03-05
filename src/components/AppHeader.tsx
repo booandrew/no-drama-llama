@@ -1,9 +1,25 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
-import { Moon, Sun, Trash2 } from 'lucide-react'
+import {
+  Moon,
+  Sun,
+  Trash2,
+  Settings,
+  History,
+  Database,
+  PenLine,
+  GitMerge,
+} from 'lucide-react'
 import llamaSvg from '@/assets/llama-svgrepo-com.svg'
 import { IntegrationsPopover } from '@/components/IntegrationsPopover'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { clearAllData } from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
@@ -39,23 +55,44 @@ export function AppHeader() {
             Llama Time
           </TabsTrigger>
           <TabsTrigger value="wool-insights">Wool Insights</TabsTrigger>
-          <TabsTrigger value="logs-history">Logs History</TabsTrigger>
-          <TabsTrigger value="sources">Sources</TabsTrigger>
-          <TabsTrigger value="custom-inputs">Custom Inputs</TabsTrigger>
-          <TabsTrigger value="mappings">Mappings</TabsTrigger>
         </TabsList>
       </Tabs>
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClearData}
-          disabled={clearing}
-          title="Clear all data"
-        >
-          <Trash2 className="size-4" />
-          <span className="sr-only">Clear all data</span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Settings className="size-4" />
+              <span className="sr-only">Settings</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setActiveTab('logs-history')}>
+              <History className="size-4" />
+              Logs History
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveTab('sources')}>
+              <Database className="size-4" />
+              Sources
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveTab('custom-inputs')}>
+              <PenLine className="size-4" />
+              Custom Inputs
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveTab('mappings')}>
+              <GitMerge className="size-4" />
+              Mappings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleClearData}
+              disabled={clearing}
+              variant="destructive"
+            >
+              <Trash2 className="size-4" />
+              Clear all data
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant="ghost"
           size="icon"

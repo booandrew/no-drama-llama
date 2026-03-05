@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
 import { AppHeader } from '@/components/AppHeader'
@@ -33,6 +34,44 @@ function useOAuthCallback(
   }, [sessionKey, exchangeCode, isRehydrated])
 }
 
+function LlamaSidebar() {
+  const totalHours = 160
+  const [logged, setLogged] = useState(142)
+  const pct = Math.round((logged / totalHours) * 100)
+
+  const randomize = () => {
+    setLogged(Math.floor(Math.random() * (totalHours + 1)))
+  }
+
+  return (
+    <Card className="self-stretch overflow-hidden">
+      <CardContent className="flex flex-1 flex-col items-center gap-3 p-4">
+        <button
+          onClick={randomize}
+          className="cursor-pointer rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
+        >
+          <RefreshCw className="inline size-3.5" /> {logged}h / {totalHours}h logged
+        </button>
+        <div className="relative w-full flex-1" role="img" aria-label="Llama Avatar">
+          {/* Greyscale layer (unfilled) */}
+          <div
+            className="absolute inset-0 bg-contain bg-center bg-no-repeat opacity-30 grayscale"
+            style={{ backgroundImage: `url(${llamaAvatarSvg})` }}
+          />
+          {/* Colored layer (filled from bottom) */}
+          <div
+            className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-[clip-path] duration-700 ease-in-out"
+            style={{
+              backgroundImage: `url(${llamaAvatarSvg})`,
+              clipPath: `inset(${100 - pct}% 0 0 0)`,
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
   const jiraExchangeCode = useJiraStore((s) => s.exchangeCode)
@@ -48,27 +87,7 @@ function App() {
           <LlamaTimeToolbar />
           <div className="grid grid-cols-[280px_minmax(0,1fr)_280px] gap-4">
             {/* Left sidebar */}
-            <div className="flex flex-col gap-4">
-              <Card>
-                <CardContent className="p-2">
-                  <img
-                    src={llamaAvatarSvg}
-                    alt="Llama Avatar"
-                    className="w-full object-contain"
-                  />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chat</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Chat interface placeholder. Ask questions about your timesheets here.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            <LlamaSidebar />
 
             {/* Center — chart */}
             <LlamaTimeTab />
