@@ -109,7 +109,14 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
   return { data, taskNames, maxSlots, totalMinutes, segmentMeta }
 }
 
-export function TimelineChart({ events, year, month, domain, hideYAxis, hideXAxis }: TimelineChartProps) {
+export function TimelineChart({
+  events,
+  year,
+  month,
+  domain,
+  hideYAxis,
+  hideXAxis,
+}: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
     [events, year, month],
@@ -288,7 +295,6 @@ export function TimelineChart({ events, year, month, domain, hideYAxis, hideXAxi
             />
           </BarChart>
         </ChartContainer>
-
       </div>
 
       {tooltip &&

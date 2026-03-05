@@ -64,14 +64,14 @@ const PAIN_POINTS = [
     icon: Clock,
     title: 'Hours wasted on hours',
     description:
-      'You spend 2 hours every month manually logging hours. The irony is not lost on us.',
+      'The average dev burns 24+ hours a year just logging time. That\u2019s three full workdays sacrificed to a spreadsheet. Let that sink in.',
   },
 ]
 
 function PainSection() {
   return (
     <section className="mx-auto max-w-5xl px-6 py-24">
-      <h2 className="fade-up mb-12 text-center text-4xl font-bold">Sound familiar?</h2>
+      <h2 className="fade-up mb-12 text-center text-4xl font-bold">The timesheet struggle is real</h2>
       <div className="grid gap-6 sm:grid-cols-3">
         {PAIN_POINTS.map((point) => (
           <Card key={point.title} className="fade-up">
@@ -100,7 +100,7 @@ const STEPS = [
     icon: BrainCircuit,
     title: 'Map',
     description:
-      'AI (powered by Anthropic) automatically maps events to the right Jira issues. Smart, not magic.',
+      'You map activities to Jira issues with AI suggestions powered by Anthropic. You stay in control, the llama just makes it faster.',
   },
   {
     icon: CheckCircle,

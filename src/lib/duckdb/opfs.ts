@@ -1,5 +1,7 @@
 export async function isOPFSAvailable(): Promise<boolean> {
-  if (!('navigator' in globalThis && 'storage' in navigator && 'getDirectory' in navigator.storage)) {
+  if (
+    !('navigator' in globalThis && 'storage' in navigator && 'getDirectory' in navigator.storage)
+  ) {
     return false
   }
   try {
@@ -61,7 +63,7 @@ export class OPFSUtil {
     const writable = await handle.createWritable()
     try {
       const buffer =
-        data instanceof ArrayBuffer ? data : new Uint8Array(data).buffer as ArrayBuffer
+        data instanceof ArrayBuffer ? data : (new Uint8Array(data).buffer as ArrayBuffer)
       await writable.write(buffer)
     } finally {
       await writable.close()

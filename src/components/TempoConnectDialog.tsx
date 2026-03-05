@@ -41,9 +41,7 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Connect Tempo</DialogTitle>
-          <DialogDescription>
-            Paste your Tempo API token to connect timesheets.
-          </DialogDescription>
+          <DialogDescription>Paste your Tempo API token to connect timesheets.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -63,7 +61,9 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
                 </a>{' '}
                 &rarr; <strong>Data Access &rarr; API Integration</strong>
               </li>
-              <li>Click <strong>New Token</strong></li>
+              <li>
+                Click <strong>New Token</strong>
+              </li>
               <li>
                 Select scope: <strong>Schemes</strong> (View)
               </li>

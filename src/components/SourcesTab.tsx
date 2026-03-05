@@ -256,10 +256,7 @@ export function SourcesTab() {
         disabled={activeSubtab === 'jira-issues'}
       />
 
-      <Tabs
-        value={activeSubtab}
-        onValueChange={(v) => setActiveSubtab(v as SourceSubtab)}
-      >
+      <Tabs value={activeSubtab} onValueChange={(v) => setActiveSubtab(v as SourceSubtab)}>
         <TabsList>
           <TabsTrigger value="jira-issues">Jira Issues</TabsTrigger>
           <TabsTrigger value="jira-worklogs">Jira Worklogs</TabsTrigger>
@@ -343,4 +340,3 @@ function getTempoColumns(view: TempoView): Column[] {
   if (view === 'holidays') return SRC_TEMPO_HOLIDAYS_COLS
   return DDS_TEMPO_DAILY_CAPACITY_COLS
 }
-

@@ -88,9 +88,7 @@ export async function fetchUserSchedule(
   for (const [day, { sum, count }] of dayTotals) {
     workloadDays.push({ day, requiredSeconds: Math.round(sum / count) })
   }
-  const workload: TempoWorkloadScheme[] = [
-    { id: 0, name: 'User Schedule', days: workloadDays },
-  ]
+  const workload: TempoWorkloadScheme[] = [{ id: 0, name: 'User Schedule', days: workloadDays }]
 
   // Collect holidays
   const holidayMap = new Map<number, TempoHolidayScheme['holidays'][number]>()
@@ -182,4 +180,3 @@ export async function fetchTempoWorklogs(
 
   return { worklogs, issueIds: [...issueIdSet] }
 }
-

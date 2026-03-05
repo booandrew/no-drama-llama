@@ -150,9 +150,7 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                 />
               </div>
 
-              {tokenError && (
-                <p className="text-destructive text-sm">{tokenError}</p>
-              )}
+              {tokenError && <p className="text-destructive text-sm">{tokenError}</p>}
 
               <Button
                 onClick={handleConnectToken}
@@ -184,9 +182,7 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                   <li>Create an OAuth 2.0 integration (or select existing)</li>
                   <li>
                     Under Authorization, add callback URL:{' '}
-                    <code className="bg-muted rounded px-1 text-xs">
-                      {window.location.origin}
-                    </code>
+                    <code className="bg-muted rounded px-1 text-xs">{window.location.origin}</code>
                   </li>
                   <li>
                     Under Permissions, add scopes:{' '}
@@ -218,11 +214,7 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                 />
               </div>
 
-              <Button
-                onClick={handleConnectOAuth}
-                disabled={!canConnectOAuth}
-                className="w-full"
-              >
+              <Button onClick={handleConnectOAuth} disabled={!canConnectOAuth} className="w-full">
                 Connect to Jira
               </Button>
             </div>

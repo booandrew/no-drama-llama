@@ -18,9 +18,7 @@ function todayISO() {
 }
 
 function daysBetween(a: string, b: string) {
-  return Math.abs(
-    (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24),
-  )
+  return Math.abs((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24))
 }
 
 interface CustomInputsState {

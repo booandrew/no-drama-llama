@@ -25,8 +25,7 @@ export function WoolInsightsTab() {
   const barData = useMemo(() => getProjectTotals(period, selectedMonth), [period, selectedMonth])
   const areaData = useMemo(() => getTimelineData(period, selectedMonth), [period, selectedMonth])
 
-  const periodLabel =
-    period === 'year' ? selectedYear : `${MONTHS[selectedMonth]} ${selectedYear}`
+  const periodLabel = period === 'year' ? selectedYear : `${MONTHS[selectedMonth]} ${selectedYear}`
 
   return (
     <div className="flex h-[calc(100svh-theme(spacing.24))] flex-col gap-3">

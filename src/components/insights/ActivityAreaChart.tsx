@@ -37,12 +37,7 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
         <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
           <AreaChart data={data} margin={{ left: 0, right: 16 }}>
             <CartesianGrid />
-            <XAxis
-              dataKey="month"
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 12 }}
-            />
+            <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
             <ChartLegend content={<ChartLegendContent />} />

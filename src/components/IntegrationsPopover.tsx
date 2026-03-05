@@ -26,8 +26,11 @@ export function IntegrationsPopover() {
   const integrations = useAppStore((s) => s.integrations)
   const toggleIntegration = useAppStore((s) => s.toggleIntegration)
   const { status: calStatus, authMethod, disconnect: calDisconnect } = useCalendarStore()
-  const { status: jiraStatus, authMethod: jiraAuthMethod, disconnect: jiraDisconnect } =
-    useJiraStore()
+  const {
+    status: jiraStatus,
+    authMethod: jiraAuthMethod,
+    disconnect: jiraDisconnect,
+  } = useJiraStore()
   const { status: tempoStatus, disconnect: tempoDisconnect } = useTempoStore()
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const eventsLoading = useCalendarStore((s) => s.eventsLoading)
@@ -164,11 +167,23 @@ export function IntegrationsPopover() {
             {/* Sync actions */}
             {isCalConnected && (
               <div className="mt-2 flex flex-col gap-1.5 border-t pt-2">
-                <Button variant="default" size="sm" onClick={handleSyncAll} disabled={syncingAll} className="w-full">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSyncAll}
+                  disabled={syncingAll}
+                  className="w-full"
+                >
                   <RefreshCw className={`size-4 ${syncingAll ? 'animate-spin' : ''}`} />
                   Sync ALL
                 </Button>
-                <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading} className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchEvents}
+                  disabled={eventsLoading}
+                  className="w-full"
+                >
                   <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
                   Refresh Google Calendar
                 </Button>

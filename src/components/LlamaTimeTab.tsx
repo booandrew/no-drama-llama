@@ -227,7 +227,10 @@ export function LlamaTimeToolbar() {
           </SelectTrigger>
           <SelectContent>
             {periodOptions.map((opt) => (
-              <SelectItem key={periodToValue(opt.year, opt.month)} value={periodToValue(opt.year, opt.month)}>
+              <SelectItem
+                key={periodToValue(opt.year, opt.month)}
+                value={periodToValue(opt.year, opt.month)}
+              >
                 {opt.label}
               </SelectItem>
             ))}
@@ -311,6 +314,13 @@ export function LlamaTimeTab() {
     }
     if (isConnected) fetchEvents()
   }, [selectedPeriod.year, selectedPeriod.month])
+
+  const forwardWheel = useCallback((e: React.WheelEvent) => {
+    const body = chartBodyRef.current
+    if (!body) return
+    body.scrollTop += e.deltaY
+    body.scrollLeft += e.deltaX
+  }, [])
 
   const handleBodyScroll = useCallback(() => {
     const body = chartBodyRef.current
@@ -426,7 +436,7 @@ export function LlamaTimeTab() {
           {/* Day labels header — fixed, syncs horizontal scroll */}
           <div className="flex shrink-0 border-b">
             <div className="w-[320px] shrink-0 border-r" />
-            <div ref={dayLabelsRef} className="flex-1 overflow-hidden">
+            <div ref={dayLabelsRef} className="flex-1 overflow-hidden" onWheel={forwardWheel}>
               <div
                 style={{
                   minWidth: `${chartWidthPercent}%`,
@@ -453,11 +463,9 @@ export function LlamaTimeTab() {
             <div
               ref={taskNamesRef}
               className="shrink-0 w-[320px] overflow-hidden border-r bg-card z-10"
+              onWheel={forwardWheel}
             >
-              <div
-                className="flex flex-col"
-                style={{ height: chartBodyHeight }}
-              >
+              <div className="flex flex-col" style={{ height: chartBodyHeight }}>
                 <div style={{ height: 10, flexShrink: 0 }} />
                 <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
                   {taskNames.map((name) => (
@@ -470,10 +478,7 @@ export function LlamaTimeTab() {
                         {name.length > 20 ? name.slice(0, 18) + '...' : name}
                       </span>
                       <Combobox>
-                        <ComboboxInput
-                          placeholder="—"
-                          className="h-7 w-[140px] shrink-0 text-xs"
-                        />
+                        <ComboboxInput placeholder="—" className="h-7 w-[140px] shrink-0 text-xs" />
                         <ComboboxContent>
                           <ComboboxList>
                             <ComboboxEmpty>No results</ComboboxEmpty>
@@ -487,11 +492,7 @@ export function LlamaTimeTab() {
             </div>
 
             {/* Chart body — main scroll container */}
-            <div
-              ref={chartBodyRef}
-              className="flex-1 overflow-auto"
-              onScroll={handleBodyScroll}
-            >
+            <div ref={chartBodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
               <div
                 style={{
                   minWidth: `${chartWidthPercent}%`,

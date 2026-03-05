@@ -23,9 +23,5 @@ export function DuckDBProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return (
-    <DuckDBContext.Provider value={{ status, error }}>
-      {children}
-    </DuckDBContext.Provider>
-  )
+  return <DuckDBContext.Provider value={{ status, error }}>{children}</DuckDBContext.Provider>
 }

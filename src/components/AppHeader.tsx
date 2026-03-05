@@ -1,15 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
-import {
-  Moon,
-  Sun,
-  Trash2,
-  Settings,
-  History,
-  Database,
-  PenLine,
-  GitMerge,
-} from 'lucide-react'
+import { Moon, Sun, Trash2, Settings, History, Database, PenLine, GitMerge } from 'lucide-react'
 import llamaSvg from '@/assets/llama-svgrepo-com.svg'
 import { IntegrationsPopover } from '@/components/IntegrationsPopover'
 import { Button } from '@/components/ui/button'
@@ -93,11 +84,7 @@ export function AppHeader() {
               Mappings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleClearData}
-              disabled={clearing}
-              variant="destructive"
-            >
+            <DropdownMenuItem onClick={handleClearData} disabled={clearing} variant="destructive">
               <Trash2 className="size-4" />
               Clear all data
             </DropdownMenuItem>

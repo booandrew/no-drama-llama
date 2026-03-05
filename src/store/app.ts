@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-type Tab = 'llama-time' | 'sources' | 'custom-inputs' | 'mappings' | 'wool-insights' | 'logs-history'
+type Tab =
+  | 'llama-time'
+  | 'sources'
+  | 'custom-inputs'
+  | 'mappings'
+  | 'wool-insights'
+  | 'logs-history'
 
 interface Integration {
   id: string
@@ -9,9 +15,7 @@ interface Integration {
   connected: boolean
 }
 
-const defaultIntegrations: Integration[] = [
-  { id: 'git', name: 'Git', connected: false },
-]
+const defaultIntegrations: Integration[] = [{ id: 'git', name: 'Git', connected: false }]
 
 interface AppState {
   activeTab: Tab

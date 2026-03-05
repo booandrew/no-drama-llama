@@ -127,11 +127,7 @@ export interface DdsTask {
 
 // ── Generic upsert ────────────────────────────────────────────────────
 
-async function upsertRows(
-  table: string,
-  rows: Record<string, unknown>[],
-  conflictColumn: string,
-) {
+async function upsertRows(table: string, rows: Record<string, unknown>[], conflictColumn: string) {
   if (rows.length === 0) return
 
   const cols = Object.keys(rows[0])
@@ -230,11 +226,7 @@ export async function upsertDdsJiraIssues(rows: DdsJiraIssue[]) {
 }
 
 export async function upsertDdsJiraWorklogs(rows: DdsJiraWorklog[]) {
-  await upsertRows(
-    'dds_jira_worklogs',
-    rows as unknown as Record<string, unknown>[],
-    'worklog_id',
-  )
+  await upsertRows('dds_jira_worklogs', rows as unknown as Record<string, unknown>[], 'worklog_id')
 }
 
 export async function upsertDdsCalendarEvents(rows: DdsCalendarEvent[]) {
@@ -332,11 +324,7 @@ export async function upsertSrcTempoHolidays(rows: SrcTempoHoliday[]) {
 
 export async function upsertDdsTempoDailyCapacity(rows: DdsTempoDailyCapacity[]) {
   if (rows.length === 0) return
-  await upsertRows(
-    'dds_tempo_daily_capacity',
-    rows as unknown as Record<string, unknown>[],
-    'date',
-  )
+  await upsertRows('dds_tempo_daily_capacity', rows as unknown as Record<string, unknown>[], 'date')
 }
 
 // ── Tempo Layer: Read ─────────────────────────────────────────────────
@@ -375,9 +363,7 @@ export async function cascadeJiraIssueAttributes(issues: DdsJiraIssue[]) {
     await exec(
       `UPDATE dds_tasks SET issue_name = ${name}, project_key = ${pkey} WHERE issue_key = ${ikey}`,
     )
-    await exec(
-      `UPDATE rpt_jira_timesheet SET issue_name = ${name} WHERE issue_key = ${ikey}`,
-    )
+    await exec(`UPDATE rpt_jira_timesheet SET issue_name = ${name} WHERE issue_key = ${ikey}`)
   }
 }
 
@@ -433,11 +419,7 @@ export function readDdsTasks(dateStart: string, dateEnd: string) {
 // ── Custom Inputs CRUD ──────────────────────────────────────────────
 
 export async function upsertDdsCustomInputs(rows: DdsCustomInput[]) {
-  await upsertRows(
-    'dds_custom_inputs',
-    rows as unknown as Record<string, unknown>[],
-    'id',
-  )
+  await upsertRows('dds_custom_inputs', rows as unknown as Record<string, unknown>[], 'id')
 }
 
 export function readDdsCustomInputs(dateStart: string, dateEnd: string) {
@@ -454,14 +436,10 @@ export async function deleteDdsCustomInput(id: string) {
 }
 
 export async function nextTaskRevision(): Promise<number> {
-  const result = await exec(
-    `SELECT value FROM _meta WHERE key = 'task_revision'`,
-  )
+  const result = await exec(`SELECT value FROM _meta WHERE key = 'task_revision'`)
   const current = parseInt(result.toArray()[0]?.toJSON().value ?? '0', 10)
   const next = current + 1
-  await exec(
-    `UPDATE _meta SET value = '${next}' WHERE key = 'task_revision'`,
-  )
+  await exec(`UPDATE _meta SET value = '${next}' WHERE key = 'task_revision'`)
   return next
 }
 
@@ -487,9 +465,7 @@ export async function readMapKeywordIssues(): Promise<MapKeywordIssue[]> {
 }
 
 export async function upsertMapKeywordIssue(row: MapKeywordIssue) {
-  const existing = await exec(
-    `SELECT id FROM map_keyword_issue WHERE id = ${escSql(row.id)}`,
-  )
+  const existing = await exec(`SELECT id FROM map_keyword_issue WHERE id = ${escSql(row.id)}`)
   if (existing.toArray().length > 0) {
     await exec(
       `UPDATE map_keyword_issue SET
@@ -599,16 +575,14 @@ export async function upsertTasksWithMappings(tasks: DdsTask[]): Promise<void> {
   await syncTimesheetForTasks(tasks)
 }
 
-export async function customInputToTask(
-  input: DdsCustomInput,
-  revision: number,
-): Promise<void> {
+export async function customInputToTask(input: DdsCustomInput, revision: number): Promise<void> {
   const task: DdsTask = {
     task_id: input.id,
     description: input.input,
-    duration: input.duration != null
-      ? `${input.duration}${input.time_unit === 'minutes' ? 'm' : 'h'}`
-      : '0h',
+    duration:
+      input.duration != null
+        ? `${input.duration}${input.time_unit === 'minutes' ? 'm' : 'h'}`
+        : '0h',
     start_time: input.start_time,
     issue_key: null,
     issue_name: null,

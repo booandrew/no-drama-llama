@@ -131,12 +131,7 @@ export function MappingsTab() {
         </CardContent>
       </Card>
 
-      <MappingForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        item={editItem}
-        onSave={handleSave}
-      />
+      <MappingForm open={formOpen} onOpenChange={setFormOpen} item={editItem} onSave={handleSave} />
     </div>
   )
 }

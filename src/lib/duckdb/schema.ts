@@ -174,10 +174,7 @@ export async function runSchema(conn: AsyncDuckDBConnection): Promise<void> {
       source_id VARCHAR
     )`,
   )
-  await exec(
-    conn,
-    `CREATE UNIQUE INDEX IF NOT EXISTS uq_dds_tasks ON dds_tasks(task_id, revision)`,
-  )
+  await exec(conn, `CREATE UNIQUE INDEX IF NOT EXISTS uq_dds_tasks ON dds_tasks(task_id, revision)`)
 
   // ── Reports Layer ──────────────────────────────────────────────────
   await exec(
