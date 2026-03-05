@@ -30,6 +30,14 @@ pnpm preview        # Preview production build locally
 
 `@/*` → `./src/*` (configured in both `tsconfig.json` and `vite.config.ts`)
 
+### State management
+
+- **Zustand** (`src/store/app.ts`) — global app state via `useAppStore` hook
+- Use Zustand for any state shared across multiple components or that represents app-level concerns (auth, user preferences, fetched data caches, UI flags like sidebar open/closed)
+- Use local `useState` only for ephemeral component-scoped state (form inputs, hover/focus, animation toggles)
+- Store pattern: `create<T>()(...)` (curried TypeScript form per Zustand v5 docs)
+- Access in components via selectors: `useAppStore((s) => s.fieldName)` — avoids unnecessary re-renders
+
 ### Key patterns
 
 - **CVA (class-variance-authority)** for type-safe component variants (see `buttonVariants` in `button.tsx`)
@@ -46,6 +54,7 @@ src/
 ├── main.tsx             # React entry point
 ├── index.css            # Tailwind globals + CSS variables
 ├── components/ui/       # shadcn/ui components (do not edit manually — regenerate with shadcn CLI)
+├── store/app.ts         # Zustand global store (useAppStore)
 ├── lib/utils.ts         # cn() utility
 └── hooks/use-mobile.ts  # Mobile detection hook
 ```
