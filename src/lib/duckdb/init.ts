@@ -2,6 +2,7 @@ import * as duckdb from '@duckdb/duckdb-wasm'
 import type { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 
 import { isOPFSAvailable } from './opfs'
+import { runSchema } from './schema'
 
 const DB_NAME = 'no-drama-llama'
 const DB_FILE = `${DB_NAME}.db`
@@ -54,6 +55,9 @@ async function doInit(): Promise<void> {
   const tempName = `_init_${Date.now()}`
   await conn.query(`CREATE OR REPLACE TABLE "${tempName}" AS SELECT 1;`)
   await conn.query(`DROP TABLE "${tempName}";`)
+
+  // 8. Create / migrate schema
+  await runSchema(conn)
 
   if (import.meta.env.DEV) {
     console.debug(`[DuckDB] Ready with OPFS persistence: ${DB_PATH}`)
