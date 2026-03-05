@@ -65,6 +65,7 @@ export interface PeriodSelectorProps {
   setPeriodMode: (mode: PeriodMode) => void
   setSelectedDate: (date: string) => void
   setCustomRange: (start: string, end: string) => string | null
+  disabled?: boolean
 }
 
 export function PeriodSelector({
@@ -75,6 +76,7 @@ export function PeriodSelector({
   setPeriodMode,
   setSelectedDate,
   setCustomRange,
+  disabled = false,
 }: PeriodSelectorProps) {
   const stepMap: Record<Exclude<PeriodMode, 'custom'>, () => { prev: string; next: string }> = {
     day: () => ({ prev: addDays(selectedDate, -1), next: addDays(selectedDate, 1) }),
@@ -95,8 +97,8 @@ export function PeriodSelector({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <ToggleGroup type="single" value={periodMode} onValueChange={handleModeChange} size="sm">
+    <div className={`flex flex-wrap items-center gap-3${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
+      <ToggleGroup type="single" value={periodMode} onValueChange={handleModeChange} size="sm" disabled={disabled}>
         <ToggleGroupItem value="day">Day</ToggleGroupItem>
         <ToggleGroupItem value="week">Week</ToggleGroupItem>
         <ToggleGroupItem value="month">Month</ToggleGroupItem>
@@ -105,13 +107,13 @@ export function PeriodSelector({
 
       {periodMode !== 'custom' && (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="size-7" onClick={handlePrev}>
+          <Button variant="ghost" size="icon" className="size-7" onClick={handlePrev} disabled={disabled}>
             <ChevronLeft className="size-4" />
           </Button>
           <span className="text-sm font-medium min-w-28 text-center">
             {formatPeriodLabel(periodMode, selectedDate)}
           </span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={handleNext}>
+          <Button variant="ghost" size="icon" className="size-7" onClick={handleNext} disabled={disabled}>
             <ChevronRight className="size-4" />
           </Button>
         </div>
@@ -122,6 +124,7 @@ export function PeriodSelector({
           <Input
             type="date"
             className="h-8 w-36"
+            disabled={disabled}
             value={customStart ?? selectedDate}
             onChange={(e) => {
               const end = customEnd ?? addDays(e.target.value, 30)
@@ -132,6 +135,7 @@ export function PeriodSelector({
           <Input
             type="date"
             className="h-8 w-36"
+            disabled={disabled}
             value={customEnd ?? addDays(selectedDate, 30)}
             onChange={(e) => {
               const start = customStart ?? selectedDate

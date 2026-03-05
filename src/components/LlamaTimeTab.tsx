@@ -19,6 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
+import { mockDdsCalendarEvents } from '@/lib/mock-data'
+import { useAppStore } from '@/store/app'
+import type { CalendarEvent } from '@/store/calendar'
 import { useCalendarStore } from '@/store/calendar'
 
 const MINUTES_PER_DAY = 1440
@@ -206,6 +209,7 @@ function MiniTimeline({
 // LlamaTimeToolbar — period selector + action buttons (full-width row)
 // ---------------------------------------------------------------------------
 export function LlamaTimeToolbar() {
+  const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
   const { isConnected, connect } = useGoogleCalendarConnect()
@@ -231,7 +235,9 @@ export function LlamaTimeToolbar() {
         </Select>
 
         <div className="flex items-center gap-2">
-          {isConnected ? (
+          {isMockMode ? (
+            <span className="text-muted-foreground text-xs">Mock mode — using synthetic data</span>
+          ) : isConnected ? (
             <Button variant="default" size="sm" disabled>
               I'm good with timelogs, Submit to JIRA
             </Button>
@@ -250,12 +256,30 @@ export function LlamaTimeToolbar() {
 // ---------------------------------------------------------------------------
 // LlamaTimeTab
 // ---------------------------------------------------------------------------
+function mockEventsForPeriod(year: number, month: number): CalendarEvent[] {
+  const start = new Date(year, month, 1).toISOString()
+  const end = new Date(year, month + 1, 1).toISOString()
+  return mockDdsCalendarEvents
+    .filter((e) => e.start_time && e.start_time >= start && e.start_time < end)
+    .map((e) => ({
+      id: e.id,
+      summary: e.summary ?? undefined,
+      start: e.start_time ? { dateTime: e.start_time } : undefined,
+      end: e.end_time ? { dateTime: e.end_time } : undefined,
+    }))
+}
+
 export function LlamaTimeTab() {
+  const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const events = useCalendarStore((s) => s.events)
+  const realEvents = useCalendarStore((s) => s.events)
   const eventsLoading = useCalendarStore((s) => s.eventsLoading)
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
+
+  const events = isMockMode
+    ? mockEventsForPeriod(selectedPeriod.year, selectedPeriod.month)
+    : realEvents
 
   const chartBodyRef = useRef<HTMLDivElement>(null)
   const dayLabelsRef = useRef<HTMLDivElement>(null)
@@ -275,10 +299,12 @@ export function LlamaTimeTab() {
     return Array.from(names).sort()
   }, [events])
 
-  const isConnected = status === 'connected' || status === 'done' || status === 'loading'
+  const isConnected =
+    isMockMode || status === 'connected' || status === 'done' || status === 'loading'
   const isInitialMount = useRef(true)
 
   useEffect(() => {
+    if (isMockMode) return
     if (isInitialMount.current) {
       isInitialMount.current = false
       return

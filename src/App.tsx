@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
@@ -10,8 +10,13 @@ import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDuckDB } from '@/lib/duckdb'
+import { getLatestDataMonth } from '@/lib/duckdb/latest-data-month'
 import { useAppStore } from '@/store/app'
+import { useCalendarStore } from '@/store/calendar'
+import { useCustomInputsStore } from '@/store/custom-inputs'
 import { useJiraStore } from '@/store/jira'
+import { useSourcesStore } from '@/store/sources'
 
 function useOAuthCallback(
   sessionKey: string,
@@ -81,6 +86,7 @@ function LlamaSidebar() {
 
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
+  const isMockMode = useAppStore((s) => s.isMockMode)
   const jiraExchangeCode = useJiraStore((s) => s.exchangeCode)
   const jiraHydrated = useJiraStore((s) => s._hasHydrated)
   useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
@@ -97,6 +103,33 @@ function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  const { isReady: isDuckDbReady } = useDuckDB()
+  const hasAutoSelected = useRef(false)
+
+  useEffect(() => {
+    if (hasAutoSelected.current) return
+    if (!isMockMode && !isDuckDbReady) return
+
+    hasAutoSelected.current = true
+
+    getLatestDataMonth(isMockMode).then((period) => {
+      const now = new Date()
+      const isCurrentMonth = period.year === now.getFullYear() && period.month === now.getMonth()
+      if (isCurrentMonth) return
+
+      // Calendar store: only override if still on current month (user hasn't changed it)
+      const calPeriod = useCalendarStore.getState().selectedPeriod
+      if (calPeriod.year === now.getFullYear() && calPeriod.month === now.getMonth()) {
+        useCalendarStore.getState().setSelectedPeriod(period)
+      }
+
+      // Sources & custom inputs: always set (not persisted, resets on reload)
+      const firstDay = `${period.year}-${String(period.month + 1).padStart(2, '0')}-01`
+      useSourcesStore.getState().setSelectedDate(firstDay)
+      useCustomInputsStore.getState().setSelectedDate(firstDay)
+    })
+  }, [isMockMode, isDuckDbReady])
 
   if (page === 'landing') {
     return <LandingPage onEnterApp={goToApp} />

@@ -8,17 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import {
-  readSrcJiraIssues,
-  readSrcJiraWorklogs,
-  readSrcCalendarEvents,
-  readSrcTempoWorkloadDays,
-  readSrcTempoHolidays,
-  readDdsJiraIssues,
-  readDdsJiraWorklogs,
-  readDdsCalendarEvents,
-  readDdsTempoDailyCapacity,
-} from '@/lib/duckdb/queries'
+import * as realQueries from '@/lib/duckdb/queries'
+import * as mockQueries from '@/lib/duckdb/mock-queries'
 import {
   syncJiraIssues,
   syncJiraWorklogs,
@@ -27,6 +18,7 @@ import {
 } from '@/lib/sync'
 import { initializeDuckDB } from '@/lib/duckdb/init'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
+import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
@@ -128,6 +120,7 @@ type TempoView = 'workload-days' | 'holidays' | 'daily-capacity'
 
 export function SourcesTab() {
   const { isReady } = useDuckDB()
+  const isMockMode = useAppStore((s) => s.isMockMode)
   const activeSubtab = useSourcesStore((s) => s.activeSubtab)
   const activeView = useSourcesStore((s) => s.activeView)
   const syncing = useSourcesStore((s) => s.syncing)
@@ -151,8 +144,10 @@ export function SourcesTab() {
 
   // Load table data
   const loadData = useCallback(async () => {
-    if (!isReady) return
+    if (!isMockMode && !isReady) return
     setError(null)
+
+    const q = isMockMode ? mockQueries : realQueries
 
     try {
       const { start, end } = getPeriod()
@@ -161,22 +156,22 @@ export function SourcesTab() {
       if (activeSubtab === 'jira-issues') {
         rows = (
           activeView === 'raw'
-            ? await readSrcJiraIssues()
-            : await readDdsJiraIssues()
+            ? await q.readSrcJiraIssues()
+            : await q.readDdsJiraIssues()
         ) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'jira-worklogs') {
         rows = (
           activeView === 'raw'
-            ? await readSrcJiraWorklogs(start, end)
-            : await readDdsJiraWorklogs(start, end)
+            ? await q.readSrcJiraWorklogs(start, end)
+            : await q.readDdsJiraWorklogs(start, end)
         ) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'tempo-capacity') {
         if (tempoView === 'workload-days') {
-          rows = (await readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
+          rows = (await q.readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
         } else if (tempoView === 'holidays') {
-          rows = (await readSrcTempoHolidays(start, end)) as unknown as Record<string, unknown>[]
+          rows = (await q.readSrcTempoHolidays(start, end)) as unknown as Record<string, unknown>[]
         } else {
-          rows = (await readDdsTempoDailyCapacity(start, end)) as unknown as Record<
+          rows = (await q.readDdsTempoDailyCapacity(start, end)) as unknown as Record<
             string,
             unknown
           >[]
@@ -184,8 +179,8 @@ export function SourcesTab() {
       } else {
         rows = (
           activeView === 'raw'
-            ? await readSrcCalendarEvents(start, end)
-            : await readDdsCalendarEvents(start, end)
+            ? await q.readSrcCalendarEvents(start, end)
+            : await q.readDdsCalendarEvents(start, end)
         ) as unknown as Record<string, unknown>[]
       }
 
@@ -194,7 +189,7 @@ export function SourcesTab() {
       console.error('[Sources] Load failed:', e)
       setError((e as Error).message)
     }
-  }, [isReady, activeSubtab, activeView, tempoView, getPeriod])
+  }, [isMockMode, isReady, activeSubtab, activeView, tempoView, getPeriod])
 
   const periodMode = useSourcesStore((s) => s.periodMode)
   const selectedDate = useSourcesStore((s) => s.selectedDate)
@@ -258,6 +253,7 @@ export function SourcesTab() {
         setPeriodMode={setPeriodMode}
         setSelectedDate={setSelectedDate}
         setCustomRange={setCustomRange}
+        disabled={activeSubtab === 'jira-issues'}
       />
 
       <Tabs
@@ -300,7 +296,7 @@ export function SourcesTab() {
           variant="default"
           size="sm"
           onClick={handleSync}
-          disabled={isSyncing || !isSourceConnected}
+          disabled={isSyncing || !isSourceConnected || isMockMode}
         >
           <RefreshCw className={`size-4 ${isSyncing ? 'animate-spin' : ''}`} />
           Sync
