@@ -1,14 +1,22 @@
 import {
   ArrowRight,
   BarChart3,
+  Bot,
   Brain,
   BrainCircuit,
   Calendar,
   CalendarX,
   CheckCircle,
   Clock,
+  Download,
   GanttChart,
   GitMerge,
+  Lock,
+  MonitorSmartphone,
+  Network,
+  Plug,
+  RefreshCcwDot,
+  ScrollText,
   Shield,
 } from 'lucide-react'
 
@@ -189,6 +197,87 @@ function FeaturesSection() {
   )
 }
 
+const ROADMAP = [
+  {
+    icon: Download,
+    title: 'Export Reports',
+    description: 'CSV & JSON export to sync with target systems manually.',
+  },
+  {
+    icon: Lock,
+    title: 'Secret Gating',
+    description: 'PIN/password + crypto protection for long-lived API keys.',
+  },
+  {
+    icon: Network,
+    title: 'More Sources',
+    description: 'GitHub, GitLab (multi-connection), Slack, Notion.',
+  },
+  {
+    icon: Plug,
+    title: 'Custom Input Integrations',
+    description: 'Google Sheets, Chrome Extension, Slack, Telegram.',
+  },
+  {
+    icon: ScrollText,
+    title: 'Custom Reports',
+    description: 'Create, export, and share reports with a visual builder.',
+  },
+  {
+    icon: Bot,
+    title: 'AI-powered Tasks',
+    description: 'Intelligent task forming, editing, and analysis.',
+  },
+  {
+    icon: RefreshCcwDot,
+    title: 'Audit Log',
+    description: 'Full traceability for API data loads and Jira worklog syncs.',
+  },
+  {
+    icon: MonitorSmartphone,
+    title: 'Sync & Mobile',
+    description: 'Cross-device sync. Looks great on mobile.',
+  },
+]
+
+function WhatsNextSection() {
+  return (
+    <section className="relative overflow-hidden px-6 py-32">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent" />
+      <div className="relative mx-auto max-w-6xl">
+        <div className="fade-up mb-6 text-center">
+          <span className="inline-block rounded-full border border-primary/30 bg-primary/20 px-5 py-2 text-sm font-bold tracking-wide text-primary uppercase">
+            Roadmap
+          </span>
+        </div>
+        <h2 className="fade-up mb-5 text-center text-5xl font-bold sm:text-6xl">
+          What&apos;s Next?
+        </h2>
+        <p className="fade-up mx-auto mb-16 max-w-xl text-center text-lg text-muted-foreground">
+          The llama is just getting started. Here&apos;s what&apos;s cooking.
+        </p>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {ROADMAP.map((item) => (
+            <div
+              key={item.title}
+              className="fade-up group rounded-3xl border border-primary/15 bg-background/60 p-7 shadow-lg backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:bg-primary/10 hover:shadow-xl hover:shadow-primary/10"
+            >
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20 transition-all group-hover:from-primary/30 group-hover:to-primary/10 group-hover:ring-primary/40">
+                <item.icon className="size-7 text-primary" />
+              </div>
+              <h3 className="mb-2 text-base font-bold">{item.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {item.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function FooterCTASection({ onEnterApp }: { onEnterApp: () => void }) {
   return (
     <section className="bg-muted/30 px-6 py-24">
@@ -214,6 +303,7 @@ export function LandingPage({ onEnterApp }: { onEnterApp: () => void }) {
       <PainSection />
       <HowItWorksSection />
       <FeaturesSection />
+      <WhatsNextSection />
       <FooterCTASection onEnterApp={onEnterApp} />
     </div>
   )
