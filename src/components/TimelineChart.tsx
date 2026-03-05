@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -9,7 +10,6 @@ import {
 
 import {
   ChartContainer,
-  ChartTooltip,
   type ChartConfig,
 } from '@/components/ui/chart'
 import type { CalendarEvent } from '@/store/calendar'
@@ -181,11 +181,18 @@ export function TimelineChart({
     return t
   }, [daysInMonth])
 
+  const [tooltip, setTooltip] = useState<{
+    meta: SegmentMeta
+    x: number
+    y: number
+  } | null>(null)
+
   if (taskNames.length === 0) return null
 
   const chartHeight = Math.max(200, taskNames.length * 44 + 60)
 
   return (
+    <div className="relative">
     <ChartContainer config={chartConfig} className="w-full" style={{ height: chartHeight }}>
       <BarChart
         layout="vertical"
@@ -194,9 +201,13 @@ export function TimelineChart({
         margin={{ top: 10, right: 20, bottom: 10, left: 10 }}
         barCategoryGap="20%"
       >
+
+        <CartesianGrid vertical={true} horizontal={false} strokeDasharray="3 3" />
         <XAxis
           type="number"
           domain={chartDomain}
+          allowDataOverflow={true}
+          orientation="top"
           ticks={ticks}
           tickFormatter={(val: number) => `${Math.floor(val / MINUTES_PER_DAY) + 1}`}
           axisLine={false}
@@ -211,44 +222,6 @@ export function TimelineChart({
           }
           axisLine={false}
           tickLine={false}
-        />
-        <ChartTooltip
-          content={({ active, payload }) => {
-            if (!active || !payload?.length) return null
-            // Find the first visible (non-gap, non-tail) segment
-            const eventEntry = payload.find(
-              (p) =>
-                p.dataKey &&
-                typeof p.dataKey === 'string' &&
-                p.dataKey.startsWith('event_') &&
-                typeof p.value === 'number' &&
-                p.value > 0,
-            )
-            if (!eventEntry) return null
-
-            const rowName = eventEntry.payload?.name as string
-            const key = `${rowName}::${eventEntry.dataKey}`
-            const meta = segmentMeta.get(key)
-            if (!meta) return null
-
-            return (
-              <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
-                <p className="font-medium">{meta.name}</p>
-                <p className="text-muted-foreground">
-                  {meta.startTime.toLocaleString('ru', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-                <p className="text-muted-foreground">
-                  {formatDuration(meta.durationMin)}
-                </p>
-              </div>
-            )
-          }}
         />
         {todayMinutes !== null && (
           <ReferenceLine
@@ -283,6 +256,8 @@ export function TimelineChart({
                 payload: { name: string }
               }
               if (!width || width <= 0) return <rect />
+              const metaKey = `${payload.name}::event_${i}`
+              const meta = segmentMeta.get(metaKey)
               return (
                 <rect
                   x={x}
@@ -293,6 +268,19 @@ export function TimelineChart({
                   fill={colorMap.get(payload.name) ?? CHART_COLORS[0]}
                   opacity={0.85}
                   className="cursor-pointer hover:opacity-100"
+                  onMouseEnter={(e) => {
+                    if (!meta) return
+                    const svgRect = (e.currentTarget as SVGRectElement).getBoundingClientRect()
+                    const chartEl = (e.currentTarget as SVGRectElement).closest('[data-slot="chart"]')
+                    if (!chartEl) return
+                    const containerRect = chartEl.getBoundingClientRect()
+                    setTooltip({
+                      meta,
+                      x: svgRect.left - containerRect.left + svgRect.width / 2,
+                      y: svgRect.top - containerRect.top,
+                    })
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
                 />
               )
             }}
@@ -308,5 +296,31 @@ export function TimelineChart({
         />
       </BarChart>
     </ChartContainer>
+    {tooltip && (
+      <div
+        className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border bg-background px-3 py-2 text-sm shadow-md"
+        style={{ left: tooltip.x, top: tooltip.y - 4 }}
+      >
+        <p className="font-medium">{tooltip.meta.name}</p>
+        <p className="text-muted-foreground">
+          {tooltip.meta.startTime.toLocaleString('ru', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+          {' — '}
+          {tooltip.meta.endTime.toLocaleString('ru', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </p>
+        <p className="text-muted-foreground">
+          {formatDuration(tooltip.meta.durationMin)}
+        </p>
+      </div>
+    )}
+    </div>
   )
 }
