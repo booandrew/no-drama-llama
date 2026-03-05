@@ -3,8 +3,8 @@ import Matter from 'matter-js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import llamaSvgUrl from '@/assets/73897352_JEMA LUIS 283-03.svg'
 
-const LLAMA_COUNT = 12
-const LLAMA_SIZE = 80
+const LLAMA_COUNT = 30
+const LLAMA_SIZE = 64
 
 interface LlamaBody {
   id: number

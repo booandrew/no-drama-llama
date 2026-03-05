@@ -52,20 +52,22 @@ function LlamaSidebar() {
         >
           <RefreshCw className="inline size-3.5" /> {logged}h / {totalHours}h logged
         </button>
-        <div className="relative w-full flex-1" role="img" aria-label="Llama Avatar">
-          {/* Greyscale layer (unfilled) */}
-          <div
-            className="absolute inset-0 bg-contain bg-center bg-no-repeat opacity-30 grayscale"
-            style={{ backgroundImage: `url(${llamaAvatarSvg})` }}
-          />
-          {/* Colored layer (filled from bottom) */}
-          <div
-            className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-[clip-path] duration-700 ease-in-out"
-            style={{
-              backgroundImage: `url(${llamaAvatarSvg})`,
-              clipPath: `inset(${100 - pct}% 0 0 0)`,
-            }}
-          />
+        <div className="relative flex w-full flex-1 items-center justify-center" role="img" aria-label="Llama Avatar">
+          <div className="relative">
+            {/* Greyscale layer (unfilled) */}
+            <img
+              src={llamaAvatarSvg}
+              alt=""
+              className="block max-h-full w-full opacity-30 grayscale"
+            />
+            {/* Colored layer (filled from bottom) */}
+            <img
+              src={llamaAvatarSvg}
+              alt=""
+              className="absolute inset-0 block max-h-full w-full transition-[clip-path] duration-700 ease-in-out"
+              style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -79,13 +81,13 @@ function App() {
   useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
 
   return (
-    <div className="flex min-h-svh flex-col">
+    <div className="flex h-svh flex-col overflow-hidden">
       <AppHeader />
-      <main className="flex-1 p-6">
+      <main className="flex flex-1 flex-col overflow-y-auto p-6">
         {activeTab === 'llama-time' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-1 flex-col gap-4 min-h-0">
           <LlamaTimeToolbar />
-          <div className="grid grid-cols-[280px_minmax(0,1fr)_280px] gap-4">
+          <div className="grid flex-1 min-h-0 grid-cols-[280px_minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
             {/* Left sidebar */}
             <LlamaSidebar />
 

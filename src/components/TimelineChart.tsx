@@ -16,6 +16,7 @@ interface TimelineChartProps {
   month: number
   domain?: [number, number]
   hideYAxis?: boolean
+  hideXAxis?: boolean
 }
 
 interface SegmentMeta {
@@ -108,7 +109,7 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
   return { data, taskNames, maxSlots, totalMinutes, segmentMeta }
 }
 
-export function TimelineChart({ events, year, month, domain, hideYAxis }: TimelineChartProps) {
+export function TimelineChart({ events, year, month, domain, hideYAxis, hideXAxis }: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
     [events, year, month],
@@ -165,7 +166,9 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
 
   if (taskNames.length === 0) return null
 
-  const chartHeight = Math.max(200, taskNames.length * 44 + 60)
+  const chartHeight = hideXAxis
+    ? Math.max(200, taskNames.length * 44 + 20)
+    : Math.max(200, taskNames.length * 44 + 60)
 
   return (
     <>
@@ -195,6 +198,8 @@ export function TimelineChart({ events, year, month, domain, hideYAxis }: Timeli
               tickFormatter={(val: number) => `${Math.floor(val / MINUTES_PER_DAY) + 1}`}
               axisLine={false}
               tickLine={false}
+              hide={hideXAxis}
+              height={hideXAxis ? 0 : undefined}
             />
             <YAxis
               type="category"

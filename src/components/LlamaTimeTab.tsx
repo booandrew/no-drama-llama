@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, RefreshCw } from 'lucide-react'
+import { Calendar } from 'lucide-react'
 
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Combobox,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
-  ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
 import {
@@ -20,7 +19,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
-import { syncAll } from '@/lib/sync'
 import { useCalendarStore } from '@/store/calendar'
 
 const MINUTES_PER_DAY = 1440
@@ -210,34 +208,8 @@ function MiniTimeline({
 export function LlamaTimeToolbar() {
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
-  const eventsLoading = useCalendarStore((s) => s.eventsLoading)
-  const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const { isConnected, connect } = useGoogleCalendarConnect()
   const periodOptions = generatePeriodOptions()
-
-  const [syncingAll, setSyncingAll] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
-
-  const handleSyncAll = async () => {
-    setSyncingAll(true)
-    setSyncError(null)
-    try {
-      const dateStart = new Date(selectedPeriod.year, selectedPeriod.month, 1)
-        .toISOString()
-        .slice(0, 10)
-      const dateEnd = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1)
-        .toISOString()
-        .slice(0, 10)
-      const result = await syncAll(dateStart, dateEnd)
-      if (result.errors.length > 0) {
-        setSyncError(result.errors.join('; '))
-      }
-    } catch (e) {
-      setSyncError((e as Error).message)
-    } finally {
-      setSyncingAll(false)
-    }
-  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -260,19 +232,9 @@ export function LlamaTimeToolbar() {
 
         <div className="flex items-center gap-2">
           {isConnected ? (
-            <>
-              <Button variant="default" size="sm" onClick={handleSyncAll} disabled={syncingAll}>
-                <RefreshCw className={`size-4 ${syncingAll ? 'animate-spin' : ''}`} />
-                Sync ALL
-              </Button>
-              <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading}>
-                <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
-                Refresh Google Calendar
-              </Button>
-              <Button variant="default" size="sm" disabled>
-                I'm good with timelogs, Submit to JIRA
-              </Button>
-            </>
+            <Button variant="default" size="sm" disabled>
+              I'm good with timelogs, Submit to JIRA
+            </Button>
           ) : (
             <Button variant="default" size="sm" onClick={connect}>
               <Calendar className="size-4" />
@@ -281,7 +243,6 @@ export function LlamaTimeToolbar() {
           )}
         </div>
       </div>
-      {syncError && <p className="text-destructive text-sm">{syncError}</p>}
     </div>
   )
 }
@@ -296,7 +257,9 @@ export function LlamaTimeTab() {
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const chartBodyRef = useRef<HTMLDivElement>(null)
+  const dayLabelsRef = useRef<HTMLDivElement>(null)
+  const taskNamesRef = useRef<HTMLDivElement>(null)
   const [scrollFraction, setScrollFraction] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
@@ -323,15 +286,17 @@ export function LlamaTimeTab() {
     if (isConnected) fetchEvents()
   }, [selectedPeriod.year, selectedPeriod.month])
 
-  const handleChartScroll = useCallback(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
-    const maxScroll = el.scrollWidth - el.clientWidth
-    setScrollFraction(maxScroll > 0 ? el.scrollLeft / maxScroll : 0)
+  const handleBodyScroll = useCallback(() => {
+    const body = chartBodyRef.current
+    if (!body) return
+    if (dayLabelsRef.current) dayLabelsRef.current.scrollLeft = body.scrollLeft
+    if (taskNamesRef.current) taskNamesRef.current.scrollTop = body.scrollTop
+    const maxScroll = body.scrollWidth - body.clientWidth
+    setScrollFraction(maxScroll > 0 ? body.scrollLeft / maxScroll : 0)
   }, [])
 
   const handleScrollTo = useCallback((fraction: number) => {
-    const el = scrollContainerRef.current
+    const el = chartBodyRef.current
     if (!el) return
     const maxScroll = el.scrollWidth - el.clientWidth
     el.scrollLeft = fraction * maxScroll
@@ -341,7 +306,7 @@ export function LlamaTimeTab() {
     (days: number) => {
       setVisibleDays(Math.max(1, Math.min(daysInMonth, days)))
       setScrollFraction(0)
-      if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0
+      if (chartBodyRef.current) chartBodyRef.current.scrollLeft = 0
     },
     [daysInMonth],
   )
@@ -355,7 +320,7 @@ export function LlamaTimeTab() {
   const lastZoomTime = useRef(0)
 
   useEffect(() => {
-    const el = scrollContainerRef.current
+    const el = chartBodyRef.current
     if (!el) return
 
     const handleWheel = (e: WheelEvent) => {
@@ -384,8 +349,10 @@ export function LlamaTimeTab() {
     )
   }
 
+  const chartBodyHeight = Math.max(200, taskNames.length * 44 + 20)
+
   return (
-    <div className="flex flex-col gap-4 min-w-0">
+    <div className="flex min-h-0 min-w-0 flex-col gap-4">
       {events.length === 0 && !eventsLoading && (
         <p className="text-muted-foreground text-sm">
           Select a period or click Refresh to load events.
@@ -393,9 +360,9 @@ export function LlamaTimeTab() {
       )}
 
       {events.length > 0 && (
-        <Card>
-          {/* Card header: zoom switcher (left) + mini-view (right) */}
-          <div className="flex items-center justify-end gap-3 px-4 py-2 border-b">
+        <Card className="flex flex-1 min-h-0 flex-col">
+          {/* Card header: zoom switcher + mini-view */}
+          <div className="flex shrink-0 items-center justify-end gap-3 border-b px-4 py-2">
             <div className="flex items-center gap-1">
               {(
                 [
@@ -430,54 +397,74 @@ export function LlamaTimeTab() {
             />
           </div>
 
-          <CardContent className="relative flex p-0">
-            {/* Separator line after the 2nd row */}
-            {taskNames.length > 2 && (() => {
-              const h = Math.max(200, taskNames.length * 44 + 60)
-              const rowH = (h - 50) / taskNames.length
-              return (
-                <div
-                  className="absolute left-0 right-0 border-b border-border z-20 pointer-events-none"
-                  style={{ top: 40 + 2 * rowH }}
-                />
-              )
-            })()}
-            {/* Sticky labels column */}
-            <div
-              className="shrink-0 w-[320px] border-r bg-card z-10 flex flex-col"
-              style={{ height: Math.max(200, taskNames.length * 44 + 60) }}
-            >
-              <div style={{ height: 40, flexShrink: 0 }} />
-              <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
-                {taskNames.map((name) => (
-                  <div
-                    key={name}
-                    className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2"
-                    title={name}
-                  >
-                    <span className="text-sm text-muted-foreground truncate shrink min-w-0">
-                      {name.length > 20 ? name.slice(0, 18) + '...' : name}
-                    </span>
-                    <Combobox>
-                      <ComboboxInput
-                        placeholder="—"
-                        className="h-7 w-[140px] shrink-0 text-xs"
-                      />
-                      <ComboboxContent>
-                        <ComboboxList>
-                          <ComboboxEmpty>No results</ComboboxEmpty>
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
-                  </div>
-                ))}
+          {/* Day labels header — fixed, syncs horizontal scroll */}
+          <div className="flex shrink-0 border-b">
+            <div className="w-[320px] shrink-0 border-r" />
+            <div ref={dayLabelsRef} className="flex-1 overflow-hidden">
+              <div
+                style={{
+                  minWidth: `${chartWidthPercent}%`,
+                  transition: 'min-width 120ms ease-out',
+                }}
+              >
+                <div className="flex h-8" style={{ marginRight: 20 }}>
+                  {Array.from({ length: daysInMonth }, (_, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 text-center text-xs text-muted-foreground leading-8"
+                    >
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            {/* Scrollable chart */}
+          </div>
+
+          {/* Scrollable body: task names + chart */}
+          <div className="flex flex-1 min-h-0">
+            {/* Task names column — synced vertical scroll */}
             <div
-              ref={scrollContainerRef}
-              className="flex-1 overflow-x-auto"
-              onScroll={handleChartScroll}
+              ref={taskNamesRef}
+              className="shrink-0 w-[320px] overflow-hidden border-r bg-card z-10"
+            >
+              <div
+                className="flex flex-col"
+                style={{ height: chartBodyHeight }}
+              >
+                <div style={{ height: 10, flexShrink: 0 }} />
+                <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
+                  {taskNames.map((name) => (
+                    <div
+                      key={name}
+                      className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2"
+                      title={name}
+                    >
+                      <span className="text-sm text-muted-foreground truncate shrink min-w-0">
+                        {name.length > 20 ? name.slice(0, 18) + '...' : name}
+                      </span>
+                      <Combobox>
+                        <ComboboxInput
+                          placeholder="—"
+                          className="h-7 w-[140px] shrink-0 text-xs"
+                        />
+                        <ComboboxContent>
+                          <ComboboxList>
+                            <ComboboxEmpty>No results</ComboboxEmpty>
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Chart body — main scroll container */}
+            <div
+              ref={chartBodyRef}
+              className="flex-1 overflow-auto"
+              onScroll={handleBodyScroll}
             >
               <div
                 style={{
@@ -490,10 +477,11 @@ export function LlamaTimeTab() {
                   year={selectedPeriod.year}
                   month={selectedPeriod.month}
                   hideYAxis
+                  hideXAxis
                 />
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       )}
     </div>

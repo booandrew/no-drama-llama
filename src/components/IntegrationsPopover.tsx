@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Blocks } from 'lucide-react'
+import { Blocks, RefreshCw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
 import { GoogleCalendarConnectDialog } from '@/components/GoogleCalendarConnectDialog'
 import { JiraConnectDialog } from '@/components/JiraConnectDialog'
 import { TempoConnectDialog } from '@/components/TempoConnectDialog'
+import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
@@ -28,9 +29,35 @@ export function IntegrationsPopover() {
   const { status: jiraStatus, authMethod: jiraAuthMethod, disconnect: jiraDisconnect } =
     useJiraStore()
   const { status: tempoStatus, disconnect: tempoDisconnect } = useTempoStore()
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
+  const eventsLoading = useCalendarStore((s) => s.eventsLoading)
+  const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const [gcalDialogOpen, setGcalDialogOpen] = useState(false)
   const [jiraDialogOpen, setJiraDialogOpen] = useState(false)
   const [tempoDialogOpen, setTempoDialogOpen] = useState(false)
+  const [syncingAll, setSyncingAll] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true)
+    setSyncError(null)
+    try {
+      const dateStart = new Date(selectedPeriod.year, selectedPeriod.month, 1)
+        .toISOString()
+        .slice(0, 10)
+      const dateEnd = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1)
+        .toISOString()
+        .slice(0, 10)
+      const result = await syncAll(dateStart, dateEnd)
+      if (result.errors.length > 0) {
+        setSyncError(result.errors.join('; '))
+      }
+    } catch (e) {
+      setSyncError((e as Error).message)
+    } finally {
+      setSyncingAll(false)
+    }
+  }
 
   const isCalConnected = isConnectedStatus(calStatus)
   const isJiraConnected = isConnectedStatus(jiraStatus)
@@ -133,6 +160,21 @@ export function IntegrationsPopover() {
                 )}
               </div>
             ))}
+
+            {/* Sync actions */}
+            {isCalConnected && (
+              <div className="mt-2 flex flex-col gap-1.5 border-t pt-2">
+                <Button variant="default" size="sm" onClick={handleSyncAll} disabled={syncingAll} className="w-full">
+                  <RefreshCw className={`size-4 ${syncingAll ? 'animate-spin' : ''}`} />
+                  Sync ALL
+                </Button>
+                <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading} className="w-full">
+                  <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
+                  Refresh Google Calendar
+                </Button>
+                {syncError && <p className="text-destructive text-xs">{syncError}</p>}
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>
