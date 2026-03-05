@@ -370,7 +370,7 @@ export function TimelineChart({
 - Modify: `src/components/PacaTimeTab.tsx`
 - Reference: `src/components/TimelineChart.tsx` (the new component)
 
-- [ ] In `src/components/PacaTimeTab.tsx`, make these changes:
+- [x] In `src/components/PacaTimeTab.tsx`, make these changes:
 
 1. **Replace import:** Change `import { GanttChart } from '@/components/GanttChart'` to `import { TimelineChart } from '@/components/TimelineChart'`
 
@@ -450,8 +450,8 @@ export function TimelineChart({
    <ToggleGroup ... onValueChange={handleZoomChange}>
    ```
 
-- [ ] Verify build passes: `pnpm build`
-- [ ] Commit: `git add src/components/PacaTimeTab.tsx && git commit -m "feat: replace GanttChart with TimelineChart in PacaTimeTab"`
+- [x] Verify build passes: `pnpm build`
+- [x] Commit: `git add src/components/PacaTimeTab.tsx && git commit -m "feat: replace GanttChart with TimelineChart in PacaTimeTab"`
 
 ---
 
