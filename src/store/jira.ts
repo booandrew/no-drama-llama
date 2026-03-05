@@ -6,7 +6,7 @@ import type { JiraIssue, JiraProject } from '@/lib/jira'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 
-const JIRA_SCOPES = 'read:jira-work read:jira-user offline_access'
+const JIRA_SCOPES = 'read:jira-work offline_access'
 const REDIRECT_URI = () => window.location.origin
 
 interface JiraState {
