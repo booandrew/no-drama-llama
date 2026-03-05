@@ -1,30 +1,13 @@
 import { useMemo, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Bar, BarChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { CalendarEvent } from '@/store/calendar'
 
 const MINUTES_PER_DAY = 1440
 
-const CHART_COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-]
+const BAR_COLOR = 'var(--chart-1)'
 
 interface TimelineChartProps {
   events: CalendarEvent[]
@@ -39,6 +22,7 @@ interface SegmentMeta {
   startTime: Date
   endTime: Date
   durationMin: number
+  solid: boolean
 }
 
 function toMinuteOffset(
@@ -107,6 +91,7 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
         startTime: new Date(event.start?.dateTime ?? event.start?.date ?? 0),
         endTime: new Date(event.end?.dateTime ?? event.end?.date ?? 0),
         durationMin: duration,
+        solid: Math.random() > 0.5,
       })
     })
 
@@ -122,13 +107,7 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
   return { data, taskNames, maxSlots, totalMinutes, segmentMeta }
 }
 
-export function TimelineChart({
-  events,
-  year,
-  month,
-  domain,
-  hideYAxis,
-}: TimelineChartProps) {
+export function TimelineChart({ events, year, month, domain, hideYAxis }: TimelineChartProps) {
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
     () => buildChartData(events, year, month),
     [events, year, month],
@@ -136,21 +115,13 @@ export function TimelineChart({
 
   const chartConfig = useMemo(() => {
     const config: ChartConfig = {}
-    taskNames.forEach((name, i) => {
+    taskNames.forEach((name) => {
       config[name] = {
         label: name.length > 20 ? name.slice(0, 18) + '...' : name,
-        color: CHART_COLORS[i % CHART_COLORS.length],
+        color: BAR_COLOR,
       }
     })
     return config
-  }, [taskNames])
-
-  const colorMap = useMemo(() => {
-    const map = new Map<string, string>()
-    taskNames.forEach((name, i) => {
-      map.set(name, CHART_COLORS[i % CHART_COLORS.length])
-    })
-    return map
   }, [taskNames])
 
   const todayMinutes = useMemo(() => {
@@ -267,16 +238,20 @@ export function TimelineChart({
                   if (!width || width <= 0) return <rect />
                   const metaKey = `${payload.name}::event_${i}`
                   const meta = segmentMeta.get(metaKey)
+                  const isSolid = meta?.solid ?? true
                   return (
                     <rect
-                      x={x}
-                      y={y}
-                      width={width}
-                      height={height}
+                      x={isSolid ? x : x + 1}
+                      y={isSolid ? y : y + 1}
+                      width={isSolid ? width : Math.max(0, width - 2)}
+                      height={isSolid ? height : Math.max(0, height - 2)}
                       rx={4}
-                      fill={colorMap.get(payload.name) ?? CHART_COLORS[0]}
-                      opacity={0.85}
-                      className="cursor-pointer hover:opacity-100"
+                      fill={BAR_COLOR}
+                      stroke={isSolid ? 'none' : BAR_COLOR}
+                      strokeWidth={isSolid ? 0 : 1}
+                      fillOpacity={isSolid ? 1 : 0.3}
+                      strokeOpacity={isSolid ? 0 : 1}
+                      className="cursor-pointer hover:fill-opacity-100 hover:stroke-opacity-100"
                       onClick={() => {
                         if (meta) {
                           setTooltip(null)
@@ -285,9 +260,7 @@ export function TimelineChart({
                       }}
                       onMouseEnter={(e) => {
                         if (!meta) return
-                        const svgRect = (
-                          e.currentTarget as SVGRectElement
-                        ).getBoundingClientRect()
+                        const svgRect = (e.currentTarget as SVGRectElement).getBoundingClientRect()
                         const chartEl = (e.currentTarget as SVGRectElement).closest(
                           '[data-slot="chart"]',
                         )
@@ -322,7 +295,7 @@ export function TimelineChart({
           >
             <p className="font-medium">{tooltip.meta.name}</p>
             <p className="text-muted-foreground">
-              {tooltip.meta.startTime.toLocaleString('ru', {
+              {tooltip.meta.startTime.toLocaleString('en-US', {
                 weekday: 'short',
                 day: 'numeric',
                 month: 'short',
@@ -330,7 +303,7 @@ export function TimelineChart({
                 minute: '2-digit',
               })}
               {' — '}
-              {tooltip.meta.endTime.toLocaleString('ru', {
+              {tooltip.meta.endTime.toLocaleString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
@@ -355,7 +328,7 @@ export function TimelineChart({
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs uppercase tracking-wide">Start</span>
                 <span>
-                  {selectedMeta.startTime.toLocaleString('ru', {
+                  {selectedMeta.startTime.toLocaleString('en-US', {
                     weekday: 'long',
                     day: 'numeric',
                     month: 'long',
@@ -368,7 +341,7 @@ export function TimelineChart({
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs uppercase tracking-wide">End</span>
                 <span>
-                  {selectedMeta.endTime.toLocaleString('ru', {
+                  {selectedMeta.endTime.toLocaleString('en-US', {
                     weekday: 'long',
                     day: 'numeric',
                     month: 'long',

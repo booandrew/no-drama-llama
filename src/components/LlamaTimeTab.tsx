@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Calendar, RefreshCw } from 'lucide-react'
 
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
 import { useCalendarStore } from '@/store/calendar'
 
 type ZoomScale = '1w' | '2w' | '1m'
@@ -198,16 +198,65 @@ function MiniTimeline({
 }
 
 // ---------------------------------------------------------------------------
+// LlamaTimeToolbar — period selector + action buttons (full-width row)
+// ---------------------------------------------------------------------------
+export function LlamaTimeToolbar() {
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
+  const eventsLoading = useCalendarStore((s) => s.eventsLoading)
+  const fetchEvents = useCalendarStore((s) => s.fetchEvents)
+  const { isConnected, connect } = useGoogleCalendarConnect()
+  const periodOptions = generatePeriodOptions()
+
+  return (
+    <div className="flex items-center justify-between">
+      <Select
+        value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
+        onValueChange={(v) => setSelectedPeriod(valueToPeriod(v))}
+      >
+        <SelectTrigger className="w-52">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {periodOptions.map((opt) => (
+            <SelectItem key={periodToValue(opt.year, opt.month)} value={periodToValue(opt.year, opt.month)}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <div className="flex items-center gap-2">
+        {isConnected ? (
+          <>
+            <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading}>
+              <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
+              Refresh Google Calendar
+            </Button>
+            <Button variant="default" size="sm" disabled>
+              I'm good with timelogs, Submit to JIRA
+            </Button>
+          </>
+        ) : (
+          <Button variant="default" size="sm" onClick={connect}>
+            <Calendar className="size-4" />
+            Connect Google Calendar
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // LlamaTimeTab
 // ---------------------------------------------------------------------------
 export function LlamaTimeTab() {
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
   const events = useCalendarStore((s) => s.events)
   const eventsLoading = useCalendarStore((s) => s.eventsLoading)
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)
   const status = useCalendarStore((s) => s.status)
-
 
   const [zoom, setZoom] = useState<ZoomScale>('1m')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -227,7 +276,6 @@ export function LlamaTimeTab() {
   }, [events])
 
   const isConnected = status === 'connected' || status === 'done' || status === 'loading'
-  const periodOptions = generatePeriodOptions()
   const isInitialMount = useRef(true)
 
   useEffect(() => {
@@ -266,31 +314,7 @@ export function LlamaTimeTab() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Top bar: period selector + refresh */}
-      <div className="flex items-center justify-between">
-        <Select
-          value={periodToValue(selectedPeriod.year, selectedPeriod.month)}
-          onValueChange={(v) => setSelectedPeriod(valueToPeriod(v))}
-        >
-          <SelectTrigger className="w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {periodOptions.map((opt) => (
-              <SelectItem key={periodToValue(opt.year, opt.month)} value={periodToValue(opt.year, opt.month)}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Button variant="default" size="sm" onClick={fetchEvents} disabled={eventsLoading}>
-          <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
-          Refresh Google Calendar
-        </Button>
-      </div>
-
+    <div className="flex flex-col gap-4 min-w-0">
       {events.length === 0 && !eventsLoading && (
         <p className="text-muted-foreground text-sm">
           Select a period or click Refresh to load events.
@@ -301,11 +325,18 @@ export function LlamaTimeTab() {
         <Card>
           {/* Card header: zoom switcher (left) + mini-view (right) */}
           <div className="flex items-center justify-end gap-3 px-4 py-2 border-b">
-            <ToggleGroup type="single" value={zoom} onValueChange={handleZoomChange} size="sm">
-              <ToggleGroupItem value="1w">Week</ToggleGroupItem>
-              <ToggleGroupItem value="2w">Bi-Week</ToggleGroupItem>
-              <ToggleGroupItem value="1m">Month</ToggleGroupItem>
-            </ToggleGroup>
+            <div className="flex items-center gap-1">
+              {([['1w', 'Week'], ['2w', 'Bi-Week'], ['1m', 'Month']] as const).map(([value, label]) => (
+                <Button
+                  key={value}
+                  variant={zoom === value ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleZoomChange(value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
 
             <MiniTimeline
               year={selectedPeriod.year}
