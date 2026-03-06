@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { logAction } from '@/store/activity-log'
+
 type TempoStatus = 'idle' | 'connected' | 'error' | 'expired'
 
 interface TempoState {
@@ -21,12 +23,14 @@ export const useTempoStore = create<TempoState>()(
       accessToken: null,
       error: null,
 
-      setToken: (token) =>
-        set({
+      setToken: (token) => {
+        logAction('connection', 'success', 'Connected to Tempo')
+        return set({
           accessToken: token,
           status: 'connected',
           error: null,
-        }),
+        })
+      },
 
       setStatus: (status) => set({ status }),
 
@@ -37,12 +41,14 @@ export const useTempoStore = create<TempoState>()(
           error: 'API token expired or revoked. Please generate a new one in Tempo Settings.',
         }),
 
-      disconnect: () =>
-        set({
+      disconnect: () => {
+        logAction('connection', 'info', 'Disconnected from Tempo')
+        return set({
           accessToken: null,
           status: 'idle',
           error: null,
-        }),
+        })
+      },
     }),
     {
       name: 'tempo-storage',

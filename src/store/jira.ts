@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 import { fetchIssues } from '@/lib/jira'
 import type { JiraIssue } from '@/lib/jira'
+import { logAction } from '@/store/activity-log'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 export type JiraAuthMethod = 'oauth' | 'token'
@@ -72,7 +73,7 @@ export const useJiraStore = create<JiraState>()(
 
       setStatus: (status) => set({ status }),
 
-      disconnect: () =>
+      disconnect: () => {
         set({
           authMethod: 'oauth',
           accessToken: null,
@@ -86,7 +87,9 @@ export const useJiraStore = create<JiraState>()(
           status: 'idle',
           issues: [],
           error: null,
-        }),
+        })
+        logAction('connection', 'info', 'Disconnected from Jira')
+      },
 
       isTokenValid: () => {
         const { authMethod, expiresAt } = get()
@@ -127,6 +130,7 @@ export const useJiraStore = create<JiraState>()(
         if (!clientId || !clientSecret) return
 
         set({ status: 'loading' })
+        logAction('connection', 'pending', 'Connecting to Jira...')
         try {
           const tokenRes = await fetch('/jira-auth/oauth/token', {
             method: 'POST',
@@ -182,8 +186,10 @@ export const useJiraStore = create<JiraState>()(
             status: 'connected',
             error: null,
           })
+          logAction('connection', 'success', 'Connected to Jira via OAuth')
         } catch (e) {
           console.error('[Jira] OAuth exchange failed:', e)
+          logAction('connection', 'error', 'Failed to connect to Jira')
           set({ status: 'error', error: (e as Error).message })
         }
       },
@@ -228,6 +234,7 @@ export const useJiraStore = create<JiraState>()(
 
       connectWithToken: async (siteUrl, email, apiToken) => {
         set({ status: 'loading', error: null })
+        logAction('connection', 'pending', 'Connecting to Jira...')
         try {
           const basicAuth = btoa(`${email}:${apiToken}`)
           const res = await fetch(`/jira-site/rest/api/3/myself`, {
@@ -251,8 +258,10 @@ export const useJiraStore = create<JiraState>()(
             status: 'connected',
             error: null,
           })
+          logAction('connection', 'success', 'Connected to Jira via API token')
         } catch (e) {
           console.error('[Jira] API token connect failed:', e)
+          logAction('connection', 'error', 'Failed to connect to Jira')
           set({ status: 'error', error: (e as Error).message })
         }
       },
@@ -269,11 +278,14 @@ export const useJiraStore = create<JiraState>()(
         }
 
         set({ loading: true, error: null })
+        logAction('sync', 'pending', 'Syncing Jira issues...')
         try {
           const issues = await fetchIssues()
           set({ issues, loading: false })
+          logAction('sync', 'success', `Loaded ${issues.length} Jira issues`)
         } catch (e) {
           set({ error: (e as Error).message, loading: false })
+          logAction('sync', 'error', 'Failed to sync Jira issues')
         }
       },
     }),

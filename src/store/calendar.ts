@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { logAction } from '@/store/activity-log'
 
 type CalendarStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 export type CalendarAuthMethod = 'org' | 'personal'
@@ -103,6 +104,7 @@ export const useCalendarStore = create<CalendarState>()(
         }
 
         set({ eventsLoading: true })
+        logAction('sync', 'pending', 'Syncing Google Calendar...')
         try {
           const timeMin = new Date(selectedPeriod.year, selectedPeriod.month, 1)
           const timeMax = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1)
@@ -128,6 +130,7 @@ export const useCalendarStore = create<CalendarState>()(
               if (res.status === 401) {
                 setExpired()
                 set({ eventsLoading: false })
+                logAction('sync', 'error', 'Google Calendar token expired')
                 return
               }
               throw new Error(`Calendar API error: ${res.status}`)
@@ -139,8 +142,10 @@ export const useCalendarStore = create<CalendarState>()(
           } while (pageToken)
 
           set({ events: allEvents, eventsLoading: false })
+          logAction('sync', 'success', `Synced ${allEvents.length} events from Google Calendar`)
         } catch (err) {
           console.error('[Calendar] Fetch failed:', err)
+          logAction('sync', 'error', 'Failed to sync Google Calendar')
           set({ eventsLoading: false })
         }
       },

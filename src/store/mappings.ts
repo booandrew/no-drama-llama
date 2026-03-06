@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { MapKeywordIssue } from '@/lib/duckdb/queries'
+import { logAction } from '@/store/activity-log'
 import {
   readMapKeywordIssues,
   upsertMapKeywordIssue,
@@ -35,15 +36,18 @@ export const useMappingsStore = create<MappingsState>()((set, get) => ({
     const id = crypto.randomUUID()
     await upsertMapKeywordIssue({ ...item, id })
     await get().loadItems()
+    logAction('mapping', 'success', 'Added new mapping rule')
   },
 
   updateItem: async (item) => {
     await upsertMapKeywordIssue(item)
     await get().loadItems()
+    logAction('mapping', 'success', 'Updated mapping rule')
   },
 
   deleteItem: async (id) => {
     await deleteMapKeywordIssue(id)
     await get().loadItems()
+    logAction('mapping', 'success', 'Deleted mapping rule')
   },
 }))
