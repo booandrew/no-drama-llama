@@ -3,8 +3,20 @@ import { createPortal } from 'react-dom'
 import { Bar, BarChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
+import { mockDdsJiraIssues } from '@/lib/mock-data'
+import { useAppStore } from '@/store/app'
 import type { CalendarEvent } from '@/store/calendar'
+import { useJiraStore } from '@/store/jira'
 
 const MINUTES_PER_DAY = 1440
 
@@ -124,6 +136,117 @@ function buildChartData(
   })
 
   return { data, taskNames, maxSlots, totalMinutes, segmentMeta }
+}
+
+function formatDateShort(date: Date): string {
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const QUICK_LOG_OPTIONS = [
+  { label: '+30min', minutes: 30 },
+  { label: '+1h', minutes: 60 },
+  { label: '+2h', minutes: 120 },
+] as const
+
+function EventDetailDialog({
+  meta,
+  onClose,
+}: {
+  meta: SegmentMeta
+  onClose: () => void
+}) {
+  const isMockMode = useAppStore((s) => s.isMockMode)
+  const jiraIssues = useJiraStore((s) => s.issues)
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(null)
+
+  const issues = isMockMode
+    ? mockDdsJiraIssues.map((i) => ({ key: i.issue_key, summary: i.issue_name }))
+    : jiraIssues.map((i) => ({ key: i.key, summary: i.summary }))
+
+  return (
+    <Dialog open onOpenChange={(open: boolean) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg">{meta.name}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 text-sm">
+          {/* Date & Time */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-muted-foreground text-xs uppercase tracking-wide shrink-0">
+                Start
+              </span>
+              <span className="text-right">{formatDateShort(meta.startTime)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-muted-foreground text-xs uppercase tracking-wide shrink-0">
+                End
+              </span>
+              <span className="text-right">{formatDateShort(meta.endTime)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-muted-foreground text-xs uppercase tracking-wide shrink-0">
+                Duration
+              </span>
+              <span className="font-medium text-right">{formatDuration(meta.durationMin)}</span>
+            </div>
+          </div>
+
+          {/* Jira Issue Mapping */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-muted-foreground text-xs uppercase tracking-wide">
+              Jira Issue
+            </span>
+            <Combobox
+              value={selectedIssue}
+              onValueChange={(val) => setSelectedIssue(val as string | null)}
+            >
+              <ComboboxInput placeholder="Search issues..." className="h-9 w-full" />
+              <ComboboxContent>
+                <ComboboxList>
+                  <ComboboxEmpty>No issues found</ComboboxEmpty>
+                  {issues.map((issue) => (
+                    <ComboboxItem key={issue.key} value={issue.key}>
+                      <span className="font-medium">{issue.key}</span>
+                      <span className="text-muted-foreground truncate">{issue.summary}</span>
+                    </ComboboxItem>
+                  ))}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
+
+          <Separator />
+
+          {/* Quick Log Add */}
+          <div className="flex flex-col gap-2">
+            <span className="text-muted-foreground text-xs uppercase tracking-wide">
+              Quick Log Add
+            </span>
+            <div className="flex gap-2">
+              {QUICK_LOG_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  className="rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    // TODO: add timelog bar with the selected issue
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export function TimelineChart({
@@ -348,54 +471,12 @@ export function TimelineChart({
           document.body,
         )}
 
-      <Dialog
-        open={!!selectedMeta}
-        onOpenChange={(open: boolean) => {
-          if (!open) setSelectedMeta(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedMeta?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedMeta && (
-            <div className="flex flex-col gap-3 text-sm">
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-xs uppercase tracking-wide">Start</span>
-                <span>
-                  {selectedMeta.startTime.toLocaleString('en-US', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-xs uppercase tracking-wide">End</span>
-                <span>
-                  {selectedMeta.endTime.toLocaleString('en-US', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Duration
-                </span>
-                <span>{formatDuration(selectedMeta.durationMin)}</span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedMeta && (
+        <EventDetailDialog
+          meta={selectedMeta}
+          onClose={() => setSelectedMeta(null)}
+        />
+      )}
     </>
   )
 }

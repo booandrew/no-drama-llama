@@ -200,7 +200,7 @@ function MiniTimeline({
         ))}
 
         {/* 3. Viewport overlay */}
-        <rect x={viewX} y={0} width={viewW} height={MINI_H} fill="#6366f1" opacity={0.15} rx={4} />
+        <rect x={viewX} y={0} width={viewW} height={MINI_H} fill="var(--chart-1)" opacity={0.15} rx={4} />
       </svg>
     </div>
   )
@@ -311,7 +311,7 @@ export function LlamaTimeTab() {
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
   const totalMinutes = daysInMonth * effectiveMinutesPerDay
 
-  const [visibleDays, setVisibleDays] = useState(daysInMonth)
+  const [visibleDays, setVisibleDays] = useState(14)
   const visibleFraction = visibleDays / daysInMonth
   const chartWidthPercent = (daysInMonth / visibleDays) * 100
 
@@ -378,7 +378,7 @@ export function LlamaTimeTab() {
 
   // Reset visibleDays when month changes
   useEffect(() => {
-    setVisibleDays(daysInMonth)
+    setVisibleDays(14)
   }, [daysInMonth])
 
   // Pinch-to-zoom (trackpad) and Cmd+scroll zoom — adjusts by ±1 day
@@ -430,9 +430,9 @@ export function LlamaTimeTab() {
       {events.length > 0 && (
         <Card className="flex flex-1 min-h-0 flex-col">
           {/* Card header: title + zoom switcher + mini-view */}
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">Activity Timeline</span>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="leading-none font-semibold">Wool Work</span>
               <span className="text-xs text-muted-foreground">
                 Map your calendar events to projects
               </span>

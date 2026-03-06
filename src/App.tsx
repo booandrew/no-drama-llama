@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
 import { AppHeader } from '@/components/AppHeader'
@@ -9,7 +10,9 @@ import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getProjectTotals, PROJECT_COLORS } from '@/components/insights/mock-data'
 import { useDuckDB } from '@/lib/duckdb'
 import { getLatestDataMonth } from '@/lib/duckdb/latest-data-month'
 import { useAppStore } from '@/store/app'
@@ -17,6 +20,10 @@ import { useCalendarStore } from '@/store/calendar'
 import { useCustomInputsStore } from '@/store/custom-inputs'
 import { useJiraStore } from '@/store/jira'
 import { useSourcesStore } from '@/store/sources'
+
+const summaryChartConfig = {
+  hours: { label: 'Hours', color: 'var(--chart-1)' },
+} satisfies ChartConfig
 
 function useOAuthCallback(
   sessionKey: string,
@@ -78,6 +85,87 @@ function LlamaSidebar() {
               style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
             />
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+const MOCK_ISSUES = [
+  { name: 'PROJ-A-101', hours: 18, color: 'var(--chart-1)' },
+  { name: 'PROJ-A-204', hours: 14, color: 'var(--chart-1)' },
+  { name: 'PROJ-B-55', hours: 12, color: 'var(--chart-2)' },
+  { name: 'PROJ-C-78', hours: 10, color: 'var(--chart-3)' },
+  { name: 'PROJ-A-310', hours: 9, color: 'var(--chart-1)' },
+  { name: 'PROJ-B-42', hours: 8, color: 'var(--chart-2)' },
+  { name: 'PROJ-D-12', hours: 7, color: 'var(--chart-4)' },
+  { name: 'PROJ-E-3', hours: 5, color: 'var(--chart-5)' },
+]
+
+function SummaryCard() {
+  const [view, setView] = useState<'projects' | 'issues'>('projects')
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
+  const projectData = useMemo(
+    () => getProjectTotals('month', selectedPeriod.month),
+    [selectedPeriod.month],
+  )
+
+  const chartData =
+    view === 'projects'
+      ? projectData.map((d) => ({ name: d.project, hours: d.hours, color: PROJECT_COLORS[d.project] ?? 'var(--chart-1)' }))
+      : MOCK_ISSUES
+
+  return (
+    <Card className="flex flex-1 flex-col gap-0 py-0">
+      <CardHeader className="shrink-0 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <CardTitle>Summary</CardTitle>
+          <div className="flex rounded-full border p-0.5 text-xs">
+            <button
+              onClick={() => setView('projects')}
+              className="rounded-full px-2.5 py-0.5 font-medium transition-colors"
+              style={
+                view === 'projects'
+                  ? { backgroundColor: 'var(--foreground)', color: 'var(--background)' }
+                  : { color: 'var(--muted-foreground)' }
+              }
+            >
+              Projects
+            </button>
+            <button
+              onClick={() => setView('issues')}
+              className="rounded-full px-2.5 py-0.5 font-medium transition-colors"
+              style={
+                view === 'issues'
+                  ? { backgroundColor: 'var(--foreground)', color: 'var(--background)' }
+                  : { color: 'var(--muted-foreground)' }
+              }
+            >
+              Issues
+            </button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3">
+        <div className="min-h-0 flex-1">
+          <ChartContainer config={summaryChartConfig} className="h-full w-full">
+            <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+              <YAxis
+                dataKey="name"
+                type="category"
+                tickLine={false}
+                axisLine={false}
+                width={view === 'issues' ? 80 : 60}
+                tick={{ fontSize: 11 }}
+              />
+              <XAxis type="number" hide />
+              <Bar dataKey="hours" radius={[0, 6, 6, 0]}>
+                {chartData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>
@@ -151,32 +239,12 @@ function App() {
 
               {/* Right sidebar */}
               <div className="flex flex-col gap-4">
-                <Card className="flex-1">
-                  <CardHeader>
-                    <CardTitle>Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Total hours</span>
-                        <span className="font-medium">164h</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Logged</span>
-                        <span className="font-medium">128h</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Remaining</span>
-                        <span className="font-medium">36h</span>
-                      </li>
-                    </ul>
-                  </CardContent>
-                </Card>
-                <Card className="flex-1">
-                  <CardHeader>
+                <SummaryCard />
+                <Card className="flex-1 gap-0 py-0">
+                  <CardHeader className="shrink-0 px-4 py-3">
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-4">
                     <p className="text-sm text-muted-foreground">
                       Submit to Jira, auto-fill gaps, export CSV — coming soon.
                     </p>
