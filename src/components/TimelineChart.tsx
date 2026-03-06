@@ -9,6 +9,7 @@ import type { CalendarEvent } from '@/store/calendar'
 const MINUTES_PER_DAY = 1440
 
 const BAR_COLOR = 'var(--chart-1)'
+const MIN_BAR_PX = 3
 
 interface TimelineChartProps {
   events: CalendarEvent[]
@@ -17,6 +18,8 @@ interface TimelineChartProps {
   domain?: [number, number]
   hideYAxis?: boolean
   hideXAxis?: boolean
+  effectiveMinutesPerDay?: number
+  workStartMinute?: number
 }
 
 interface SegmentMeta {
@@ -36,17 +39,31 @@ function toMinuteOffset(
   return Math.max(0, Math.round((ms - monthStartMs) / 60000))
 }
 
+function remapMinutes(absoluteMin: number, effectiveMpd: number, workStartMin: number): number {
+  if (effectiveMpd >= MINUTES_PER_DAY) return absoluteMin
+  const day = Math.floor(absoluteMin / MINUTES_PER_DAY)
+  const timeInDay = absoluteMin % MINUTES_PER_DAY
+  const adjusted = Math.max(0, Math.min(effectiveMpd, timeInDay - workStartMin))
+  return day * effectiveMpd + adjusted
+}
+
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
 }
 
-function buildChartData(events: CalendarEvent[], year: number, month: number) {
+function buildChartData(
+  events: CalendarEvent[],
+  year: number,
+  month: number,
+  effectiveMpd: number,
+  workStartMin: number,
+) {
   const monthStart = new Date(year, month, 1)
   const monthStartMs = monthStart.getTime()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const totalMinutes = daysInMonth * MINUTES_PER_DAY
+  const totalMinutes = daysInMonth * effectiveMpd
 
   const grouped = new Map<string, CalendarEvent[]>()
   for (const e of events) {
@@ -77,8 +94,8 @@ function buildChartData(events: CalendarEvent[], year: number, month: number) {
     let cursor = 0
 
     sorted.forEach((event, i) => {
-      const startMin = toMinuteOffset(event.start, monthStartMs)
-      const endMin = toMinuteOffset(event.end, monthStartMs)
+      const startMin = remapMinutes(toMinuteOffset(event.start, monthStartMs), effectiveMpd, workStartMin)
+      const endMin = remapMinutes(toMinuteOffset(event.end, monthStartMs), effectiveMpd, workStartMin)
       const clampedStart = Math.max(0, Math.min(totalMinutes, startMin))
       const clampedEnd = Math.max(0, Math.min(totalMinutes, endMin))
       const gap = Math.max(0, clampedStart - cursor)
@@ -116,10 +133,15 @@ export function TimelineChart({
   domain,
   hideYAxis,
   hideXAxis,
+  effectiveMinutesPerDay,
+  workStartMinute,
 }: TimelineChartProps) {
+  const effectiveMpd = effectiveMinutesPerDay ?? MINUTES_PER_DAY
+  const workStartMin = workStartMinute ?? 0
+
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
-    () => buildChartData(events, year, month),
-    [events, year, month],
+    () => buildChartData(events, year, month, effectiveMpd, workStartMin),
+    [events, year, month, effectiveMpd, workStartMin],
   )
 
   const chartConfig = useMemo(() => {
@@ -138,8 +160,9 @@ export function TimelineChart({
     const monthStart = new Date(year, month, 1)
     const monthEnd = new Date(year, month + 1, 1)
     if (now < monthStart || now >= monthEnd) return null
-    return Math.round((now.getTime() - monthStart.getTime()) / 60000)
-  }, [year, month])
+    const rawMin = Math.round((now.getTime() - monthStart.getTime()) / 60000)
+    return remapMinutes(rawMin, effectiveMpd, workStartMin)
+  }, [year, month, effectiveMpd, workStartMin])
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const chartDomain = domain ?? [0, totalMinutes]
@@ -147,21 +170,21 @@ export function TimelineChart({
   // Day label ticks at noon (centered within each day)
   const ticks = useMemo(() => {
     const t: number[] = []
-    const half = MINUTES_PER_DAY / 2
+    const half = effectiveMpd / 2
     for (let d = 0; d < daysInMonth; d++) {
-      t.push(d * MINUTES_PER_DAY + half)
+      t.push(d * effectiveMpd + half)
     }
     return t
-  }, [daysInMonth])
+  }, [daysInMonth, effectiveMpd])
 
   // Day boundary lines at midnight
   const dayBoundaries = useMemo(() => {
     const b: number[] = []
     for (let d = 0; d <= daysInMonth; d++) {
-      b.push(d * MINUTES_PER_DAY)
+      b.push(d * effectiveMpd)
     }
     return b
-  }, [daysInMonth])
+  }, [daysInMonth, effectiveMpd])
 
   const [tooltip, setTooltip] = useState<{
     meta: SegmentMeta
@@ -202,7 +225,7 @@ export function TimelineChart({
               allowDataOverflow={true}
               orientation="top"
               ticks={ticks}
-              tickFormatter={(val: number) => `${Math.floor(val / MINUTES_PER_DAY) + 1}`}
+              tickFormatter={(val: number) => `${Math.floor(val / effectiveMpd) + 1}`}
               axisLine={false}
               tickLine={false}
               hide={hideXAxis}
@@ -252,11 +275,13 @@ export function TimelineChart({
                   const metaKey = `${payload.name}::event_${i}`
                   const meta = segmentMeta.get(metaKey)
                   const isSolid = meta?.solid ?? true
+                  const w = Math.max(MIN_BAR_PX, width)
+                  const barX = width < MIN_BAR_PX ? x - (MIN_BAR_PX - width) / 2 : x
                   return (
                     <rect
-                      x={isSolid ? x : x + 1}
+                      x={isSolid ? barX : barX + 1}
                       y={isSolid ? y : y + 1}
-                      width={isSolid ? width : Math.max(0, width - 2)}
+                      width={isSolid ? w : Math.max(0, w - 2)}
                       height={isSolid ? height : Math.max(0, height - 2)}
                       rx={4}
                       fill={BAR_COLOR}

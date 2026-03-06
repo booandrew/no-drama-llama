@@ -86,7 +86,10 @@ export function LlamaBucket() {
     <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
       <CardHeader className="shrink-0 px-4 py-3">
         <CardTitle>My herd of LLamas</CardTitle>
-        <CardDescription>You have collected {llamas.length} llamas to your herd</CardDescription>
+        <CardDescription>
+          Every month you log adds a llama to your herd. You now have {llamas.length} llamas.
+          Impressive!
+        </CardDescription>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 px-0 pb-0">
         <div

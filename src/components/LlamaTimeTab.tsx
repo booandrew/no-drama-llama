@@ -25,6 +25,26 @@ import type { CalendarEvent } from '@/store/calendar'
 import { useCalendarStore } from '@/store/calendar'
 
 const MINUTES_PER_DAY = 1440
+const WORK_START_HOUR = 7
+const WORK_END_HOUR = 20
+const WORK_MINUTES_PER_DAY = (WORK_END_HOUR - WORK_START_HOUR) * 60
+
+function hasEventsOutsideWorkHours(events: CalendarEvent[]): boolean {
+  const wStart = WORK_START_HOUR * 60
+  const wEnd = WORK_END_HOUR * 60
+  for (const e of events) {
+    if (!e.start?.dateTime) continue
+    const sd = new Date(e.start.dateTime)
+    const sm = sd.getHours() * 60 + sd.getMinutes()
+    if (sm < wStart || sm >= wEnd) return true
+    if (e.end?.dateTime) {
+      const ed = new Date(e.end.dateTime)
+      const em = ed.getHours() * 60 + ed.getMinutes()
+      if (em !== 0 && em > wEnd) return true
+    }
+  }
+  return false
+}
 
 const MONTH_NAMES = [
   'January',
@@ -141,9 +161,10 @@ function MiniTimeline({
   const weekBlocks = useMemo(() => {
     const blocks: { x: number; width: number }[] = []
     const tm = totalMinutes
+    const mpd = tm / daysInMonth
     for (let w = 0; w < weeksCount; w++) {
-      const weekStartMin = w * 7 * MINUTES_PER_DAY
-      const weekEndMin = Math.min(tm, (w + 1) * 7 * MINUTES_PER_DAY)
+      const weekStartMin = w * 7 * mpd
+      const weekEndMin = Math.min(tm, (w + 1) * 7 * mpd)
       const x = (weekStartMin / tm) * MINI_W + (w === 0 ? 6 : 2)
       const x2 = (weekEndMin / tm) * MINI_W - (w === weeksCount - 1 ? 6 : 2)
       blocks.push({ x, width: x2 - x })
@@ -278,13 +299,17 @@ export function LlamaTimeTab() {
     ? mockEventsForPeriod(selectedPeriod.year, selectedPeriod.month)
     : realEvents
 
+  const use24h = useMemo(() => hasEventsOutsideWorkHours(events), [events])
+  const effectiveMinutesPerDay = use24h ? MINUTES_PER_DAY : WORK_MINUTES_PER_DAY
+  const workStartMinute = use24h ? 0 : WORK_START_HOUR * 60
+
   const chartBodyRef = useRef<HTMLDivElement>(null)
   const dayLabelsRef = useRef<HTMLDivElement>(null)
   const taskNamesRef = useRef<HTMLDivElement>(null)
   const [scrollFraction, setScrollFraction] = useState(0)
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
-  const totalMinutes = daysInMonth * MINUTES_PER_DAY
+  const totalMinutes = daysInMonth * effectiveMinutesPerDay
 
   const [visibleDays, setVisibleDays] = useState(daysInMonth)
   const visibleFraction = visibleDays / daysInMonth
@@ -404,40 +429,48 @@ export function LlamaTimeTab() {
 
       {events.length > 0 && (
         <Card className="flex flex-1 min-h-0 flex-col">
-          {/* Card header: zoom switcher + mini-view */}
-          <div className="flex shrink-0 items-center justify-end gap-3 border-b px-4 py-2">
-            <div className="flex items-center gap-1">
-              {(
-                [
-                  [1, 'Day'],
-                  [7, 'Week'],
-                  [14, 'Bi-Week'],
-                  [daysInMonth, 'Month'],
-                ] as [number, string][]
-              ).map(([days, label], i, arr) => {
-                const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
-                const isActive = visibleDays > prevMax && visibleDays <= days
-                return (
-                  <Button
-                    key={label}
-                    variant={isActive ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setVisibleDaysClamped(days)}
-                  >
-                    {label}
-                  </Button>
-                )
-              })}
+          {/* Card header: title + zoom switcher + mini-view */}
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold">Activity Timeline</span>
+              <span className="text-xs text-muted-foreground">
+                Map your calendar events to projects
+              </span>
             </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    [1, 'Day'],
+                    [7, 'Week'],
+                    [14, 'Bi-Week'],
+                    [daysInMonth, 'Month'],
+                  ] as [number, string][]
+                ).map(([days, label], i, arr) => {
+                  const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
+                  const isActive = visibleDays > prevMax && visibleDays <= days
+                  return (
+                    <Button
+                      key={label}
+                      variant={isActive ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setVisibleDaysClamped(days)}
+                    >
+                      {label}
+                    </Button>
+                  )
+                })}
+              </div>
 
-            <MiniTimeline
+              <MiniTimeline
               year={selectedPeriod.year}
               month={selectedPeriod.month}
               totalMinutes={totalMinutes}
               scrollFraction={scrollFraction}
               visibleFraction={visibleFraction}
               onScrollTo={handleScrollTo}
-            />
+              />
+            </div>
           </div>
 
           {/* Day labels header — fixed, syncs horizontal scroll */}
@@ -512,6 +545,8 @@ export function LlamaTimeTab() {
                   month={selectedPeriod.month}
                   hideYAxis
                   hideXAxis
+                  effectiveMinutesPerDay={effectiveMinutesPerDay}
+                  workStartMinute={workStartMinute}
                 />
               </div>
             </div>
