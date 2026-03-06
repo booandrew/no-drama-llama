@@ -9,6 +9,7 @@ import { CustomInputsTab } from '@/components/CustomInputsTab'
 import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
+import { QuickActionsCard } from '@/components/QuickActionsCard'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -238,18 +239,9 @@ function App() {
               <LlamaTimeTab />
 
               {/* Right sidebar */}
-              <div className="flex flex-col gap-4">
+              <div className="relative flex flex-col gap-4">
                 <SummaryCard />
-                <Card className="flex-1 gap-0 py-0">
-                  <CardHeader className="shrink-0 px-4 py-3">
-                    <CardTitle>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-4">
-                    <p className="text-sm text-muted-foreground">
-                      Submit to Jira, auto-fill gaps, export CSV — coming soon.
-                    </p>
-                  </CardContent>
-                </Card>
+                <QuickActionsCard />
               </div>
             </div>
           </div>
