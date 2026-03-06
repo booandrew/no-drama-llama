@@ -475,7 +475,12 @@ export function LlamaTimeTab() {
 
           {/* Day labels header — fixed, syncs horizontal scroll */}
           <div className="flex shrink-0 border-b">
-            <div className="w-[320px] shrink-0 border-r" />
+            <div className="flex w-[320px] shrink-0 items-center justify-between gap-2 border-r pl-3 pr-2">
+              <span className="text-xs font-medium text-muted-foreground">Name</span>
+              <span className="w-[140px] shrink-0 text-xs font-medium text-muted-foreground text-center">
+                Issue code
+              </span>
+            </div>
             <div ref={dayLabelsRef} className="flex-1 overflow-hidden" onWheel={forwardWheel}>
               <div
                 style={{
