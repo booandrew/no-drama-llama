@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { DuckDBContext } from './context'
 import type { DuckDBStatus } from './context'
-import { closeDuckDB, initializeDuckDB } from './init'
+import { initializeDuckDB } from './init'
 
 export function DuckDBProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<DuckDBStatus>('loading')
@@ -16,11 +16,9 @@ export function DuckDBProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : String(err))
         setStatus('error')
       })
-
-    return () => {
-      // Wait for init to settle before tearing down to avoid OPFS handle races
-      initializeDuckDB().catch(() => {}).finally(() => closeDuckDB())
-    }
+    // No cleanup — this provider wraps the entire app and never truly unmounts.
+    // doInit() already handles stale state (leftover db/worker) on re-init,
+    // and the OPFS retry logic handles stale access handles after HMR.
   }, [])
 
   return <DuckDBContext.Provider value={{ status, error }}>{children}</DuckDBContext.Provider>
