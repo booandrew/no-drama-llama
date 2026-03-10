@@ -3,19 +3,20 @@ import { persist } from 'zustand/middleware'
 
 import { fetchIssues } from '@/lib/jira'
 import type { JiraIssue } from '@/lib/jira'
+import { generateCodeChallenge, generateCodeVerifier } from '@/lib/pkce'
 import { logAction } from '@/store/activity-log'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
-export type JiraAuthMethod = 'oauth' | 'token'
+export type JiraAuthMethod = 'oauth-org' | 'oauth-personal' | 'token'
 
 const JIRA_SCOPES = 'read:jira-work read:me offline_access'
 const REDIRECT_URI = () => window.location.origin
+const ORG_CLIENT_ID = import.meta.env.VITE_JIRA_CLIENT_ID as string | undefined
 
 interface JiraState {
   status: JiraStatus
   authMethod: JiraAuthMethod
-  clientId: string | null
-  clientSecret: string | null
+  personalClientId: string | null
   accessToken: string | null
   refreshToken: string | null
   expiresAt: number | null
@@ -33,14 +34,14 @@ interface JiraState {
 
   _hasHydrated: boolean
   setHydrated: () => void
-  setCredentials: (clientId: string, clientSecret: string) => void
+  setPersonalClientId: (clientId: string) => void
   setStatus: (status: JiraStatus) => void
   disconnect: () => void
   isTokenValid: () => boolean
   setExpired: () => void
   exchangeCode: (code: string) => Promise<void>
   refreshAccessToken: () => Promise<boolean>
-  startOAuth: () => void
+  startOAuth: (method: 'oauth-org' | 'oauth-personal', clientId: string) => Promise<void>
   connectWithToken: (siteUrl: string, email: string, apiToken: string) => Promise<void>
   loadAll: () => Promise<void>
 }
@@ -49,9 +50,8 @@ export const useJiraStore = create<JiraState>()(
   persist(
     (set, get) => ({
       status: 'idle',
-      authMethod: 'oauth',
-      clientId: null,
-      clientSecret: null,
+      authMethod: 'oauth-org',
+      personalClientId: null,
       accessToken: null,
       refreshToken: null,
       expiresAt: null,
@@ -69,13 +69,13 @@ export const useJiraStore = create<JiraState>()(
       loading: false,
       error: null,
 
-      setCredentials: (clientId, clientSecret) => set({ clientId, clientSecret }),
+      setPersonalClientId: (clientId) => set({ personalClientId: clientId }),
 
       setStatus: (status) => set({ status }),
 
       disconnect: () => {
         set({
-          authMethod: 'oauth',
+          authMethod: 'oauth-org',
           accessToken: null,
           refreshToken: null,
           expiresAt: null,
@@ -105,12 +105,20 @@ export const useJiraStore = create<JiraState>()(
           status: 'expired',
         }),
 
-      startOAuth: () => {
-        const { clientId } = get()
+      startOAuth: async (method, clientId) => {
         if (!clientId) return
+
+        set({ authMethod: method })
+        if (method === 'oauth-personal') {
+          set({ personalClientId: clientId })
+        }
 
         const state = crypto.randomUUID()
         sessionStorage.setItem('jira_oauth_state', state)
+
+        const codeVerifier = generateCodeVerifier()
+        const codeChallenge = await generateCodeChallenge(codeVerifier)
+        sessionStorage.setItem('jira_pkce_verifier', codeVerifier)
 
         const params = new URLSearchParams({
           audience: 'api.atlassian.com',
@@ -120,14 +128,24 @@ export const useJiraStore = create<JiraState>()(
           state,
           response_type: 'code',
           prompt: 'consent',
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
         })
 
         window.location.href = `https://auth.atlassian.com/authorize?${params}`
       },
 
       exchangeCode: async (code) => {
-        const { clientId, clientSecret } = get()
-        if (!clientId || !clientSecret) return
+        const { authMethod, personalClientId } = get()
+        const clientId = authMethod === 'oauth-personal' ? personalClientId : ORG_CLIENT_ID
+        if (!clientId) return
+
+        const codeVerifier = sessionStorage.getItem('jira_pkce_verifier')
+        if (!codeVerifier) {
+          set({ status: 'error', error: 'Missing PKCE code verifier' })
+          return
+        }
+        sessionStorage.removeItem('jira_pkce_verifier')
 
         set({ status: 'loading' })
         logAction('connection', 'pending', 'Connecting to Jira...')
@@ -138,9 +156,9 @@ export const useJiraStore = create<JiraState>()(
             body: JSON.stringify({
               grant_type: 'authorization_code',
               client_id: clientId,
-              client_secret: clientSecret,
               code,
               redirect_uri: REDIRECT_URI(),
+              code_verifier: codeVerifier,
             }),
           })
 
@@ -195,8 +213,9 @@ export const useJiraStore = create<JiraState>()(
       },
 
       refreshAccessToken: async () => {
-        const { clientId, clientSecret, refreshToken } = get()
-        if (!clientId || !clientSecret || !refreshToken) {
+        const { authMethod, personalClientId, refreshToken } = get()
+        const clientId = authMethod === 'oauth-personal' ? personalClientId : ORG_CLIENT_ID
+        if (!clientId || !refreshToken) {
           get().setExpired()
           return false
         }
@@ -208,7 +227,6 @@ export const useJiraStore = create<JiraState>()(
             body: JSON.stringify({
               grant_type: 'refresh_token',
               client_id: clientId,
-              client_secret: clientSecret,
               refresh_token: refreshToken,
             }),
           })
@@ -293,8 +311,7 @@ export const useJiraStore = create<JiraState>()(
       name: 'jira-storage',
       partialize: (state) => ({
         authMethod: state.authMethod,
-        clientId: state.clientId,
-        clientSecret: state.clientSecret,
+        personalClientId: state.personalClientId,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         expiresAt: state.expiresAt,
