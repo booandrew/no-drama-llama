@@ -1,10 +1,7 @@
 import { useTempoStore } from '@/store/tempo'
 
 function headers() {
-  const { accessToken } = useTempoStore.getState()
-  if (!accessToken) throw new Error('Tempo not connected: no API token')
   return {
-    Authorization: `Bearer ${accessToken}`,
     Accept: 'application/json',
   }
 }
@@ -144,7 +141,6 @@ export async function fetchTempoWorklogs(
   let offset = 0
   const all: TempoWorklogResult[] = []
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const params = new URLSearchParams({
       from: dateStart.slice(0, 10),

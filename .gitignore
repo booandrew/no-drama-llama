@@ -26,6 +26,10 @@ dist-ssr
 # Environment
 .env
 .env.local
+.dev.vars
+
+# Wrangler
+.wrangler
 
 # Worktrees
 .worktrees

@@ -5,19 +5,8 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 
 export function useGoogleCalendarConnect() {
-  const { status, accessToken, setConnected, setStatus, setExpired, disconnect, isTokenValid } =
-    useCalendarStore()
+  const { status, setConnected, setStatus, disconnect } = useCalendarStore()
   const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null)
-
-  useEffect(() => {
-    if (accessToken) {
-      if (isTokenValid()) {
-        setStatus('connected')
-      } else {
-        setExpired()
-      }
-    }
-  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -40,7 +29,7 @@ export function useGoogleCalendarConnect() {
       }
     }, 100)
     return () => clearInterval(interval)
-  }, [])
+  }, [setConnected, setStatus])
 
   const connect = () => {
     tokenClientRef.current?.requestAccessToken()

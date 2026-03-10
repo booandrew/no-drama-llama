@@ -22,13 +22,14 @@ const isConnectedStatus = (status: string) =>
   status === 'connected' || status === 'done' || status === 'loading'
 
 export function IntegrationsPopover() {
-  const { status: calStatus, authMethod, disconnect: calDisconnect } = useCalendarStore()
-  const {
-    status: jiraStatus,
-    authMethod: jiraAuthMethod,
-    disconnect: jiraDisconnect,
-  } = useJiraStore()
-  const { status: tempoStatus, disconnect: tempoDisconnect } = useTempoStore()
+  const calStatus = useCalendarStore((s) => s.status)
+  const authMethod = useCalendarStore((s) => s.authMethod)
+  const calDisconnect = useCalendarStore((s) => s.disconnect)
+  const jiraStatus = useJiraStore((s) => s.status)
+  const jiraAuthMethod = useJiraStore((s) => s.authMethod)
+  const jiraDisconnect = useJiraStore((s) => s.disconnect)
+  const tempoStatus = useTempoStore((s) => s.status)
+  const tempoDisconnect = useTempoStore((s) => s.disconnect)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const eventsLoading = useCalendarStore((s) => s.eventsLoading)
   const fetchEvents = useCalendarStore((s) => s.fetchEvents)

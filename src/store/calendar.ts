@@ -20,7 +20,7 @@ export interface Period {
   month: number
 }
 
-const CALENDAR_API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const CALENDAR_API = '/gcal-api/calendar/v3/calendars/primary/events'
 
 function currentPeriod(): Period {
   const now = new Date()
@@ -29,8 +29,6 @@ function currentPeriod(): Period {
 
 interface CalendarState {
   status: CalendarStatus
-  accessToken: string | null
-  expiresAt: number | null
   authMethod: CalendarAuthMethod | null
   personalClientId: string | null
   selectedPeriod: Period
@@ -41,65 +39,62 @@ interface CalendarState {
   setPersonalClientId: (clientId: string) => void
   setStatus: (status: CalendarStatus) => void
   setExpired: () => void
-  disconnect: () => void
-  isTokenValid: () => boolean
+  disconnect: () => Promise<void>
   setSelectedPeriod: (period: Period) => void
   fetchEvents: () => Promise<void>
+  checkAuthStatus: () => Promise<void>
 }
 
 export const useCalendarStore = create<CalendarState>()(
   persist(
     (set, get) => ({
       status: 'idle',
-      accessToken: null,
-      expiresAt: null,
       authMethod: null,
       personalClientId: null,
       selectedPeriod: currentPeriod(),
       events: [],
       eventsLoading: false,
 
-      setConnected: (accessToken, expiresIn, method) =>
-        set({
-          accessToken,
-          expiresAt: Date.now() + expiresIn * 1000,
-          authMethod: method,
-          status: 'connected',
-        }),
+      setConnected: async (accessToken, expiresIn, method) => {
+        try {
+          const res = await fetch('/gcal-api/.auth/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accessToken, expiresIn, authMethod: method }),
+          })
+          if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
+          set({ authMethod: method, status: 'connected' })
+        } catch (e) {
+          console.error('[Calendar] Connect failed:', e)
+          set({ status: 'error' })
+        }
+      },
 
       setPersonalClientId: (clientId) => set({ personalClientId: clientId }),
 
       setStatus: (status) => set({ status }),
 
-      setExpired: () =>
-        set({
-          accessToken: null,
-          expiresAt: null,
-          status: 'expired',
-        }),
+      setExpired: () => set({ status: 'expired' }),
 
-      disconnect: () =>
+      disconnect: async () => {
+        try {
+          await fetch('/gcal-api/.auth/disconnect', { method: 'DELETE' })
+        } catch {
+          // best-effort
+        }
         set({
-          accessToken: null,
-          expiresAt: null,
           authMethod: null,
           personalClientId: null,
           status: 'idle',
           events: [],
-        }),
-
-      isTokenValid: () => {
-        const { expiresAt } = get()
-        if (!expiresAt) return false
-        return expiresAt > Date.now() + 60_000
+        })
       },
 
       setSelectedPeriod: (period) => set({ selectedPeriod: period }),
 
       fetchEvents: async () => {
-        const { accessToken, selectedPeriod, isTokenValid, setExpired } = get()
-        if (!accessToken || !isTokenValid()) {
-          setExpired()
+        const { selectedPeriod, status } = get()
+        if (status !== 'connected' && status !== 'done' && status !== 'loading') {
           return
         }
 
@@ -122,13 +117,11 @@ export const useCalendarStore = create<CalendarState>()(
             })
             if (pageToken) params.set('pageToken', pageToken)
 
-            const res = await fetch(`${CALENDAR_API}?${params}`, {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            })
+            const res = await fetch(`${CALENDAR_API}?${params}`)
 
             if (!res.ok) {
               if (res.status === 401) {
-                setExpired()
+                get().setExpired()
                 set({ eventsLoading: false })
                 logAction('sync', 'error', 'Google Calendar token expired')
                 return
@@ -149,23 +142,34 @@ export const useCalendarStore = create<CalendarState>()(
           set({ eventsLoading: false })
         }
       },
+
+      checkAuthStatus: async () => {
+        try {
+          const res = await fetch('/gcal-api/.auth/status')
+          if (!res.ok) return
+          const data = await res.json()
+          if (data.connected) {
+            set({
+              status: 'connected',
+              authMethod: data.authMethod ?? null,
+            })
+          } else {
+            set({ status: 'idle' })
+          }
+        } catch {
+          // offline or not deployed yet
+        }
+      },
     }),
     {
       name: 'gcal-storage',
       partialize: (state) => ({
-        accessToken: state.accessToken,
-        expiresAt: state.expiresAt,
         authMethod: state.authMethod,
         personalClientId: state.personalClientId,
         selectedPeriod: state.selectedPeriod,
       }),
       onRehydrateStorage: () => (state) => {
-        if (!state?.accessToken) return
-        if (state.isTokenValid()) {
-          state.setStatus('connected')
-        } else {
-          state.setExpired()
-        }
+        state?.checkAuthStatus()
       },
     },
   ),

@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "wrangler pages dev -- pnpm vite",
+    "dev:vite": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "preview": "vite preview",
-    "preview:cf": "pnpm build && npx wrangler pages dev dist/"
+    "preview:cf": "pnpm build && wrangler pages dev dist/"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

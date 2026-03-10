@@ -28,7 +28,7 @@ import { useTempoStore } from '@/store/tempo'
 
 // ── Calendar API ──────────────────────────────────────────────────────
 
-const CALENDAR_API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const CALENDAR_API = '/gcal-api/calendar/v3/calendars/primary/events'
 
 interface GCalRawEvent {
   id: string
@@ -42,7 +42,6 @@ interface GCalRawEvent {
 }
 
 async function fetchCalendarEvents(
-  accessToken: string,
   dateStart: string,
   dateEnd: string,
 ): Promise<GCalRawEvent[]> {
@@ -59,9 +58,7 @@ async function fetchCalendarEvents(
     })
     if (pageToken) params.set('pageToken', pageToken)
 
-    const res = await fetch(`${CALENDAR_API}?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    const res = await fetch(`${CALENDAR_API}?${params}`)
 
     if (!res.ok) {
       if (res.status === 401) {
@@ -118,13 +115,13 @@ export async function syncJiraIssues() {
 // ── Sync: Jira Worklogs ──────────────────────────────────────────────
 
 export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
-  const tempoToken = useTempoStore.getState().accessToken
+  const tempoStatus = useTempoStore.getState().status
   const accountId = useJiraStore.getState().accountId
 
   let worklogs: import('@/lib/jira').JiraWorklog[]
   let issues: import('@/lib/jira').JiraIssue[]
 
-  if (tempoToken && accountId) {
+  if (tempoStatus === 'connected' && accountId) {
     // Tempo connected — fetch worklogs from Tempo API, then resolve issues from Jira
     const tempo = await fetchTempoWorklogs(accountId, dateStart, dateEnd)
     worklogs = tempo.worklogs
@@ -183,13 +180,13 @@ export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
 // ── Sync: Google Calendar Events ─────────────────────────────────────
 
 export async function syncCalendarEvents(dateStart: string, dateEnd: string) {
-  const { accessToken, isTokenValid, setExpired } = useCalendarStore.getState()
-  if (!accessToken || !isTokenValid()) {
+  const { status, setExpired } = useCalendarStore.getState()
+  if (status !== 'connected' && status !== 'done' && status !== 'loading') {
     setExpired()
-    throw new Error('Google Calendar token expired')
+    throw new Error('Google Calendar not connected')
   }
 
-  const rawEvents = await fetchCalendarEvents(accessToken, dateStart, dateEnd)
+  const rawEvents = await fetchCalendarEvents(dateStart, dateEnd)
 
   // Upsert raw source
   await upsertSrcCalendarEvents(
@@ -239,9 +236,9 @@ export async function syncCalendarEvents(dateStart: string, dateEnd: string) {
 // ── Sync: Tempo Capacity ─────────────────────────────────────────────
 
 export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
-  const { accessToken } = useTempoStore.getState()
-  if (!accessToken) {
-    throw new Error('Tempo not connected: no API token')
+  const { status } = useTempoStore.getState()
+  if (status !== 'connected') {
+    throw new Error('Tempo not connected')
   }
 
   // Fetch user schedule (workload + holidays) via user-level endpoint

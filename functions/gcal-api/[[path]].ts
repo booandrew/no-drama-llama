@@ -1,12 +1,12 @@
 import { getCookie, setCookie, clearCookie } from '../_shared/cookies'
 import { createProxy } from '../_shared/proxy'
 
-const baseProxy = createProxy('https://api.tempo.io', 'tempo-api')
+const baseProxy = createProxy('https://www.googleapis.com', 'gcal-api')
 
 export const onRequest: PagesFunction = async (context) => {
   const { request } = context
   const url = new URL(request.url)
-  const path = url.pathname.replace(/^\/tempo-api\/?/, '')
+  const path = url.pathname.replace(/^\/gcal-api\/?/, '')
 
   // POST .auth/connect
   if (request.method === 'POST' && path === '.auth/connect') {
@@ -24,7 +24,7 @@ export const onRequest: PagesFunction = async (context) => {
   }
 
   // All other paths: inject auth from cookies
-  const accessToken = getCookie(request, 'tempo_access_token')
+  const accessToken = getCookie(request, 'gcal_access_token')
   if (!accessToken) {
     return new Response(JSON.stringify({ error: 'Not authenticated' }), {
       status: 401,
@@ -46,16 +46,32 @@ export const onRequest: PagesFunction = async (context) => {
 
 async function handleConnect(request: Request, url: URL): Promise<Response> {
   try {
-    const { token } = await request.json<{ token: string }>()
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Missing token' }), {
+    const { accessToken, expiresIn, authMethod } = await request.json<{
+      accessToken: string
+      expiresIn: number
+      authMethod: string
+    }>()
+
+    if (!accessToken) {
+      return new Response(JSON.stringify({ error: 'Missing accessToken' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
+    const cookieOpts = { url }
     const headers = new Headers({ 'Content-Type': 'application/json' })
-    headers.append('Set-Cookie', setCookie('tempo_access_token', token, { url }))
+    headers.append(
+      'Set-Cookie',
+      setCookie('gcal_access_token', accessToken, {
+        ...cookieOpts,
+        maxAge: expiresIn || 3600,
+      }),
+    )
+    headers.append(
+      'Set-Cookie',
+      setCookie('gcal_auth_method', authMethod || 'org', cookieOpts),
+    )
 
     return new Response(JSON.stringify({ connected: true }), { headers })
   } catch (e) {
@@ -64,15 +80,17 @@ async function handleConnect(request: Request, url: URL): Promise<Response> {
 }
 
 function handleStatus(request: Request): Response {
-  const connected = !!getCookie(request, 'tempo_access_token')
+  const connected = !!getCookie(request, 'gcal_access_token')
+  const authMethod = getCookie(request, 'gcal_auth_method')
   return new Response(
-    JSON.stringify({ connected }),
+    JSON.stringify({ connected, authMethod }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 }
 
 function handleDisconnect(): Response {
   const headers = new Headers({ 'Content-Type': 'application/json' })
-  headers.append('Set-Cookie', clearCookie('tempo_access_token'))
+  headers.append('Set-Cookie', clearCookie('gcal_access_token'))
+  headers.append('Set-Cookie', clearCookie('gcal_auth_method'))
   return new Response(JSON.stringify({ disconnected: true }), { headers })
 }

@@ -4,7 +4,8 @@
 
 ```bash
 pnpm install        # install dependencies
-pnpm dev            # Vite dev server with HMR
+pnpm dev            # Vite + wrangler (edge functions + HMR), browse on :8788
+pnpm dev:vite       # Vite only (no edge functions)
 pnpm build          # TypeScript type-check + Vite production build
 pnpm lint           # ESLint (flat config)
 pnpm format         # Prettier (src/**/*.{ts,tsx,css})

@@ -168,9 +168,9 @@ const FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Client-side Only',
+    title: 'Secure by Design',
     description:
-      'All tokens stay in your browser. No backend, no data leaves your machine. Zero drama.',
+      'Tokens stored in HttpOnly cookies, never visible to JavaScript. Edge-proxied API calls. Zero drama.',
   },
 ]
 

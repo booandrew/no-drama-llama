@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
 
 interface Props {
@@ -20,10 +19,10 @@ interface Props {
 }
 
 export function TempoConnectDialog({ open, onOpenChange }: Props) {
-  const { accessToken, setToken } = useTempoStore()
-  const siteUrl = useJiraStore((s) => s.siteUrl)
-  const [tokenInput, setTokenInput] = useState(accessToken ?? '')
+  const setToken = useTempoStore((s) => s.setToken)
+  const [tokenInput, setTokenInput] = useState('')
   const [siteInput, setSiteInput] = useState('')
+  const [connecting, setConnecting] = useState(false)
 
   const tempoSettingsPath =
     '/plugins/servlet/ac/io.tempo.jira/tempo-app#!/configuration/api-integration'
@@ -40,25 +39,24 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
     }
   }
 
-  const resolvedBase =
-    resolveSiteBase(siteInput) ?? (siteUrl ? `https://${siteUrl}` : null)
+  const resolvedBase = resolveSiteBase(siteInput)
   const tempoSettingsUrl = resolvedBase ? `${resolvedBase}${tempoSettingsPath}` : null
   const tempoSettingsDisplay = resolvedBase
     ? `${resolvedBase}${tempoSettingsPath}`
     : `https://<your-org>.atlassian.net${tempoSettingsPath}`
 
-  // Sync input when dialog opens (handles Zustand rehydration timing)
-  useEffect(() => {
-    if (open && accessToken) setTokenInput(accessToken)
-  }, [open, accessToken])
-
   const canConnect = tokenInput.trim().length > 0
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     const token = tokenInput.trim()
     if (!token) return
-    setToken(token)
-    onOpenChange(false)
+    setConnecting(true)
+    try {
+      await setToken(token)
+      onOpenChange(false)
+    } finally {
+      setConnecting(false)
+    }
   }
 
   return (
@@ -77,16 +75,14 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
                 Open <strong>Tempo Settings</strong> &rarr;{' '}
                 <strong>Data Access</strong> &rarr; <strong>API Integration</strong>
                 <div className="mt-1 ml-1 space-y-1">
-                  {!siteUrl && (
-                    <Input
-                      value={siteInput || 'your-org.atlassian.net'}
-                      onFocus={() => {
-                        if (!siteInput) setSiteInput('your-org.atlassian.net')
-                      }}
-                      onChange={(e) => setSiteInput(e.target.value)}
-                      className="h-7 text-xs"
-                    />
-                  )}
+                  <Input
+                    value={siteInput || 'your-org.atlassian.net'}
+                    onFocus={() => {
+                      if (!siteInput) setSiteInput('your-org.atlassian.net')
+                    }}
+                    onChange={(e) => setSiteInput(e.target.value)}
+                    className="h-7 text-xs"
+                  />
                   {tempoSettingsUrl ? (
                     <a
                       href={tempoSettingsUrl}
@@ -136,8 +132,8 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
             />
           </div>
 
-          <Button onClick={handleConnect} disabled={!canConnect} className="w-full">
-            Connect to Tempo
+          <Button onClick={handleConnect} disabled={!canConnect || connecting} className="w-full">
+            {connecting ? 'Connecting\u2026' : 'Connect to Tempo'}
           </Button>
         </div>
       </DialogContent>

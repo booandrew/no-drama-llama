@@ -1,9 +1,8 @@
 import { useJiraStore } from '@/store/jira'
 
 function getBase() {
-  const { authMethod, cloudId, siteUrl } = useJiraStore.getState()
+  const { authMethod, cloudId } = useJiraStore.getState()
   if (authMethod === 'token') {
-    if (!siteUrl) throw new Error('Jira not connected: no site URL')
     return '/jira-site/rest/api/3'
   }
   if (!cloudId) throw new Error('Jira not connected: no cloudId')
@@ -17,30 +16,9 @@ function getAccountId() {
 }
 
 function headers(): Record<string, string> {
-  const { authMethod, accessToken, email, apiToken, siteUrl } = useJiraStore.getState()
-  if (authMethod === 'token') {
-    if (!email || !apiToken) throw new Error('Jira not connected: no credentials')
-    return {
-      Authorization: `Basic ${btoa(`${email}:${apiToken}`)}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-Jira-Host': siteUrl!,
-    }
-  }
-  if (!accessToken) throw new Error('Jira not connected: no access token')
   return {
-    Authorization: `Bearer ${accessToken}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
-  }
-}
-
-async function ensureValidToken() {
-  const store = useJiraStore.getState()
-  if (store.authMethod === 'token') return
-  if (!store.isTokenValid()) {
-    const refreshed = await store.refreshAccessToken()
-    if (!refreshed) throw new Error('Jira token expired and refresh failed')
   }
 }
 
@@ -66,8 +44,6 @@ export async function fetchWorklogs(
   dateStart: string,
   dateEnd: string,
 ): Promise<{ worklogs: JiraWorklog[]; issues: JiraIssue[] }> {
-  await ensureValidToken()
-
   // Step 1: JQL to find only issues where current user logged work in the period
   const accountId = getAccountId()
   const jqlStart = dateStart.slice(0, 10) // "YYYY-MM-DD"
@@ -148,7 +124,6 @@ export async function fetchWorklogs(
 
 export async function fetchIssuesByIds(issueIds: string[]): Promise<JiraIssue[]> {
   if (issueIds.length === 0) return []
-  await ensureValidToken()
 
   const all: JiraIssue[] = []
   // Batch into chunks of 200 to stay within JQL length limits
@@ -184,7 +159,6 @@ export async function fetchIssuesByIds(issueIds: string[]): Promise<JiraIssue[]>
 }
 
 export async function fetchIssues(): Promise<JiraIssue[]> {
-  await ensureValidToken()
   const aid = getAccountId()
   const jql = `(assignee = "${aid}" OR creator = "${aid}" OR reporter = "${aid}") ORDER BY key ASC`
   const params = new URLSearchParams({
