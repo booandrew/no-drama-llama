@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { DdsCustomInput } from '@/lib/duckdb/queries'
+import { logAction } from '@/store/activity-log'
 import {
   readDdsCustomInputs,
   upsertDdsCustomInputs,
@@ -84,6 +85,7 @@ export const useCustomInputsStore = create<CustomInputsState>()((set, get) => ({
     const revision = await nextTaskRevision()
     await customInputToTask(fullItem, revision)
     await get().loadItems()
+    logAction('input', 'success', 'Added custom time entry')
   },
 
   updateItem: async (item) => {
@@ -91,10 +93,12 @@ export const useCustomInputsStore = create<CustomInputsState>()((set, get) => ({
     const revision = await nextTaskRevision()
     await customInputToTask(item, revision)
     await get().loadItems()
+    logAction('input', 'success', 'Updated custom time entry')
   },
 
   deleteItem: async (id) => {
     await deleteDdsCustomInput(id)
     await get().loadItems()
+    logAction('input', 'success', 'Deleted custom time entry')
   },
 }))

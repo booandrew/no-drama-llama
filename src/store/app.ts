@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { logAction } from '@/store/activity-log'
+
 type Tab =
   | 'llama-time'
   | 'sources'
@@ -39,7 +41,12 @@ export const useAppStore = create<AppState>()(
           ),
         })),
       isMockMode: false,
-      toggleMockMode: () => set((state) => ({ isMockMode: !state.isMockMode })),
+      toggleMockMode: () =>
+        set((state) => {
+          const next = !state.isMockMode
+          logAction('settings', 'info', next ? 'Switched to mock data' : 'Switched to real data')
+          return { isMockMode: next }
+        }),
     }),
     {
       name: 'app-store',
