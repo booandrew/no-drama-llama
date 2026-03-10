@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -21,63 +21,33 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-function readPersonalClientId(): string {
-  try {
-    const raw = localStorage.getItem('jira-storage')
-    if (!raw) return ''
-    const parsed = JSON.parse(raw)
-    return parsed?.state?.personalClientId ?? ''
-  } catch {
-    return ''
-  }
-}
-
 export function JiraConnectDialog({ open, onOpenChange }: Props) {
-  const [clientIdInput, setClientIdInput] = useState('')
-
   const [siteUrlInput, setSiteUrlInput] = useState('')
   const [emailInput, setEmailInput] = useState('')
   const [apiTokenInput, setApiTokenInput] = useState('')
   const [tokenError, setTokenError] = useState<string | null>(null)
   const [tokenLoading, setTokenLoading] = useState(false)
 
-  useEffect(() => {
-    if (open) {
-      setClientIdInput(readPersonalClientId())
-    }
-  }, [open])
-
   const hasOrgMethod = !!ORG_CLIENT_ID
-  const canConnectPersonalOAuth = clientIdInput.trim()
   const canConnectToken = siteUrlInput.trim() && emailInput.trim() && apiTokenInput.trim()
 
   const connectOrg = () => {
     if (!ORG_CLIENT_ID) return
     onOpenChange(false)
     setTimeout(async () => {
-      await useJiraStore.getState().startOAuth('oauth-org', ORG_CLIENT_ID)
-    }, 50)
-  }
-
-  const connectPersonalOAuth = () => {
-    const id = clientIdInput.trim()
-    if (!id) return
-    onOpenChange(false)
-    setTimeout(async () => {
-      await useJiraStore.getState().startOAuth('oauth-personal', id)
+      await useJiraStore.getState().startOAuth()
     }, 50)
   }
 
   const handleConnectToken = async () => {
-    let site = siteUrlInput.trim()
-    if (site.includes('://')) {
-      try {
-        site = new URL(site).hostname
-      } catch {
-        // keep as-is
-      }
+    const raw = siteUrlInput.trim().replace(/\/+$/, '')
+    const withScheme = raw.includes('://') ? raw : `https://${raw}`
+    let site: string
+    try {
+      site = new URL(withScheme).hostname
+    } catch {
+      site = raw
     }
-    site = site.replace(/\/+$/, '')
 
     const email = emailInput.trim()
     const token = apiTokenInput.trim()
@@ -108,16 +78,13 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
           <DialogDescription>Choose an authentication method to connect.</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue={hasOrgMethod ? 'org' : 'personal'}>
+        <Tabs defaultValue={hasOrgMethod ? 'org' : 'token'}>
           <TabsList className="w-full">
             {hasOrgMethod && (
               <TabsTrigger value="org" className="flex-1">
                 T1A
               </TabsTrigger>
             )}
-            <TabsTrigger value="personal" className="flex-1">
-              Personal
-            </TabsTrigger>
             <TabsTrigger value="token" className="flex-1">
               API Token
             </TabsTrigger>
@@ -133,15 +100,6 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
               </Button>
             </TabsContent>
           )}
-
-          <TabsContent value="personal" className="mt-4">
-            <PersonalOAuthForm
-              clientIdInput={clientIdInput}
-              setClientIdInput={setClientIdInput}
-              onConnect={connectPersonalOAuth}
-              canConnect={!!canConnectPersonalOAuth}
-            />
-          </TabsContent>
 
           <TabsContent value="token" className="mt-4">
             <div className="flex flex-col gap-4">
@@ -169,8 +127,10 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                 <Label htmlFor="jira-site-url">Site URL</Label>
                 <Input
                   id="jira-site-url"
-                  placeholder="yourcompany.atlassian.net"
-                  value={siteUrlInput}
+                  value={siteUrlInput || 'your-org.atlassian.net'}
+                  onFocus={() => {
+                    if (!siteUrlInput) setSiteUrlInput('your-org.atlassian.net')
+                  }}
                   onChange={(e) => setSiteUrlInput(e.target.value)}
                 />
               </div>
@@ -204,67 +164,12 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                 disabled={!canConnectToken || tokenLoading}
                 className="w-full"
               >
-                {tokenLoading ? 'Connecting…' : 'Connect to Jira'}
+                {tokenLoading ? 'Connecting\u2026' : 'Connect to Jira'}
               </Button>
             </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function PersonalOAuthForm({
-  clientIdInput,
-  setClientIdInput,
-  onConnect,
-  canConnect,
-}: {
-  clientIdInput: string
-  setClientIdInput: (v: string) => void
-  onConnect: () => void
-  canConnect: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="text-muted-foreground space-y-1 text-sm">
-        <p className="text-foreground font-medium">How to get your Client ID:</p>
-        <ol className="list-inside list-decimal space-y-0.5">
-          <li>
-            Go to{' '}
-            <a
-              href="https://developer.atlassian.com/console/myapps/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary inline-flex items-center gap-0.5 underline"
-            >
-              Atlassian Developer Console
-              <ExternalLink className="size-3" />
-            </a>
-          </li>
-          <li>Create an OAuth 2.0 integration (or select existing)</li>
-          <li>
-            Under Authorization, add callback URL:{' '}
-            <code className="bg-muted rounded px-1 text-xs">{window.location.origin}</code>
-          </li>
-          <li>
-            Under Permissions, add scopes:{' '}
-            <code className="bg-muted rounded px-1 text-xs">read:jira-work</code>{' '}
-            <code className="bg-muted rounded px-1 text-xs">read:me</code>
-          </li>
-          <li>Copy Client ID from Settings</li>
-        </ol>
-      </div>
-
-      <Input
-        placeholder="Client ID"
-        value={clientIdInput}
-        onChange={(e) => setClientIdInput(e.target.value)}
-      />
-
-      <Button onClick={onConnect} disabled={!canConnect} className="w-full">
-        Connect with Personal Account
-      </Button>
-    </div>
   )
 }

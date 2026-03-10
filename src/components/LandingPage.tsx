@@ -66,7 +66,7 @@ const PAIN_POINTS = [
     icon: Brain,
     title: 'The guessing game',
     description:
-      'Was that meeting about Project A or Project B? Let me check my calendar... and Jira... and Git...',
+      'Was that meeting about Project A or Project B? Let me check my calendar... and Jira...',
   },
   {
     icon: Clock,
@@ -102,7 +102,7 @@ const STEPS = [
     icon: Calendar,
     title: 'Collect',
     description:
-      'NoDramaLLama pulls your activity from Google Calendar, Jira issues & worklogs, and Git commits.',
+      'NoDramaLLama pulls your activity from Google Calendar, Jira issues & worklogs.',
   },
   {
     icon: BrainCircuit,
@@ -164,7 +164,7 @@ const FEATURES = [
     icon: GitMerge,
     title: 'Smart Mappings',
     description:
-      'AI maps calendar events and Git activity to Jira issues. Learns your patterns over time.',
+      'AI maps calendar events to Jira issues. Learns your patterns over time.',
   },
   {
     icon: Shield,
@@ -211,7 +211,7 @@ const ROADMAP = [
   {
     icon: Network,
     title: 'More Sources',
-    description: 'GitHub, GitLab (multi-connection), Slack, Notion.',
+    description: 'Slack, Notion, and more.',
   },
   {
     icon: Plug,

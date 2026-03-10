@@ -7,7 +7,7 @@ import { generateCodeChallenge, generateCodeVerifier } from '@/lib/pkce'
 import { logAction } from '@/store/activity-log'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
-export type JiraAuthMethod = 'oauth-org' | 'oauth-personal' | 'token'
+export type JiraAuthMethod = 'oauth-org' | 'token'
 
 const JIRA_SCOPES = 'read:jira-work read:me offline_access'
 const REDIRECT_URI = () => window.location.origin
@@ -16,7 +16,6 @@ const ORG_CLIENT_ID = import.meta.env.VITE_JIRA_CLIENT_ID as string | undefined
 interface JiraState {
   status: JiraStatus
   authMethod: JiraAuthMethod
-  personalClientId: string | null
   accessToken: string | null
   refreshToken: string | null
   expiresAt: number | null
@@ -34,14 +33,13 @@ interface JiraState {
 
   _hasHydrated: boolean
   setHydrated: () => void
-  setPersonalClientId: (clientId: string) => void
   setStatus: (status: JiraStatus) => void
   disconnect: () => void
   isTokenValid: () => boolean
   setExpired: () => void
   exchangeCode: (code: string) => Promise<void>
   refreshAccessToken: () => Promise<boolean>
-  startOAuth: (method: 'oauth-org' | 'oauth-personal', clientId: string) => Promise<void>
+  startOAuth: () => Promise<void>
   connectWithToken: (siteUrl: string, email: string, apiToken: string) => Promise<void>
   loadAll: () => Promise<void>
 }
@@ -51,7 +49,6 @@ export const useJiraStore = create<JiraState>()(
     (set, get) => ({
       status: 'idle',
       authMethod: 'oauth-org',
-      personalClientId: null,
       accessToken: null,
       refreshToken: null,
       expiresAt: null,
@@ -68,8 +65,6 @@ export const useJiraStore = create<JiraState>()(
       issues: [],
       loading: false,
       error: null,
-
-      setPersonalClientId: (clientId) => set({ personalClientId: clientId }),
 
       setStatus: (status) => set({ status }),
 
@@ -105,13 +100,10 @@ export const useJiraStore = create<JiraState>()(
           status: 'expired',
         }),
 
-      startOAuth: async (method, clientId) => {
-        if (!clientId) return
+      startOAuth: async () => {
+        if (!ORG_CLIENT_ID) return
 
-        set({ authMethod: method })
-        if (method === 'oauth-personal') {
-          set({ personalClientId: clientId })
-        }
+        set({ authMethod: 'oauth-org' })
 
         const state = crypto.randomUUID()
         sessionStorage.setItem('jira_oauth_state', state)
@@ -122,7 +114,7 @@ export const useJiraStore = create<JiraState>()(
 
         const params = new URLSearchParams({
           audience: 'api.atlassian.com',
-          client_id: clientId,
+          client_id: ORG_CLIENT_ID,
           scope: JIRA_SCOPES,
           redirect_uri: REDIRECT_URI(),
           state,
@@ -136,9 +128,7 @@ export const useJiraStore = create<JiraState>()(
       },
 
       exchangeCode: async (code) => {
-        const { authMethod, personalClientId } = get()
-        const clientId = authMethod === 'oauth-personal' ? personalClientId : ORG_CLIENT_ID
-        if (!clientId) return
+        if (!ORG_CLIENT_ID) return
 
         const codeVerifier = sessionStorage.getItem('jira_pkce_verifier')
         if (!codeVerifier) {
@@ -150,12 +140,13 @@ export const useJiraStore = create<JiraState>()(
         set({ status: 'loading' })
         logAction('connection', 'pending', 'Connecting to Jira...')
         try {
+          // client_secret is injected server-side by the proxy
           const tokenRes = await fetch('/jira-auth/oauth/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               grant_type: 'authorization_code',
-              client_id: clientId,
+              client_id: ORG_CLIENT_ID,
               code,
               redirect_uri: REDIRECT_URI(),
               code_verifier: codeVerifier,
@@ -213,20 +204,20 @@ export const useJiraStore = create<JiraState>()(
       },
 
       refreshAccessToken: async () => {
-        const { authMethod, personalClientId, refreshToken } = get()
-        const clientId = authMethod === 'oauth-personal' ? personalClientId : ORG_CLIENT_ID
-        if (!clientId || !refreshToken) {
+        const { refreshToken } = get()
+        if (!ORG_CLIENT_ID || !refreshToken) {
           get().setExpired()
           return false
         }
 
         try {
+          // client_secret is injected server-side by the proxy
           const res = await fetch('/jira-auth/oauth/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               grant_type: 'refresh_token',
-              client_id: clientId,
+              client_id: ORG_CLIENT_ID,
               refresh_token: refreshToken,
             }),
           })
@@ -311,7 +302,6 @@ export const useJiraStore = create<JiraState>()(
       name: 'jira-storage',
       partialize: (state) => ({
         authMethod: state.authMethod,
-        personalClientId: state.personalClientId,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         expiresAt: state.expiresAt,

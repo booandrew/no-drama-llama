@@ -14,7 +14,6 @@ import { GoogleCalendarConnectDialog } from '@/components/GoogleCalendarConnectD
 import { JiraConnectDialog } from '@/components/JiraConnectDialog'
 import { TempoConnectDialog } from '@/components/TempoConnectDialog'
 import { syncAll } from '@/lib/sync'
-import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
@@ -23,8 +22,6 @@ const isConnectedStatus = (status: string) =>
   status === 'connected' || status === 'done' || status === 'loading'
 
 export function IntegrationsPopover() {
-  const integrations = useAppStore((s) => s.integrations)
-  const toggleIntegration = useAppStore((s) => s.toggleIntegration)
   const { status: calStatus, authMethod, disconnect: calDisconnect } = useCalendarStore()
   const {
     status: jiraStatus,
@@ -136,33 +133,6 @@ export function IntegrationsPopover() {
                 </Button>
               )}
             </div>
-
-            {/* Other mock integrations (Git, etc.) */}
-            {integrations.map((integration) => (
-              <div
-                key={integration.id}
-                className="flex items-center justify-between rounded-md border px-3 py-2"
-              >
-                <span className="text-sm font-medium">{integration.name}</span>
-                {integration.connected ? (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleIntegration(integration.id)}
-                  >
-                    Connected
-                  </Badge>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => toggleIntegration(integration.id)}
-                  >
-                    Connect
-                  </Button>
-                )}
-              </div>
-            ))}
 
             {/* Sync actions */}
             {isCalConnected && (

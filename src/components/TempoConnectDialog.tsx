@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
 
 interface Props {
@@ -20,7 +21,31 @@ interface Props {
 
 export function TempoConnectDialog({ open, onOpenChange }: Props) {
   const { accessToken, setToken } = useTempoStore()
+  const siteUrl = useJiraStore((s) => s.siteUrl)
   const [tokenInput, setTokenInput] = useState(accessToken ?? '')
+  const [siteInput, setSiteInput] = useState('')
+
+  const tempoSettingsPath =
+    '/plugins/servlet/ac/io.tempo.jira/tempo-app#!/configuration/api-integration'
+
+  function resolveSiteBase(input: string): string | null {
+    const trimmed = input.trim().replace(/\/+$/, '')
+    if (!trimmed) return null
+    const withScheme = trimmed.includes('://') ? trimmed : `https://${trimmed}`
+    try {
+      const url = new URL(withScheme)
+      return `${url.protocol}//${url.host}`
+    } catch {
+      return null
+    }
+  }
+
+  const resolvedBase =
+    resolveSiteBase(siteInput) ?? (siteUrl ? `https://${siteUrl}` : null)
+  const tempoSettingsUrl = resolvedBase ? `${resolvedBase}${tempoSettingsPath}` : null
+  const tempoSettingsDisplay = resolvedBase
+    ? `${resolvedBase}${tempoSettingsPath}`
+    : `https://<your-org>.atlassian.net${tempoSettingsPath}`
 
   // Sync input when dialog opens (handles Zustand rehydration timing)
   useEffect(() => {
@@ -38,7 +63,7 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Connect Tempo</DialogTitle>
           <DialogDescription>Paste your Tempo API token to connect timesheets.</DialogDescription>
@@ -49,17 +74,35 @@ export function TempoConnectDialog({ open, onOpenChange }: Props) {
             <p className="text-foreground font-medium">How to get your API token:</p>
             <ol className="list-inside list-decimal space-y-0.5">
               <li>
-                Open{' '}
-                <a
-                  href="https://app.tempo.io/timesheets/settings/api-integration"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary inline-flex items-center gap-0.5 underline"
-                >
-                  Tempo Settings
-                  <ExternalLink className="size-3" />
-                </a>{' '}
-                &rarr; <strong>Data Access &rarr; API Integration</strong>
+                Open <strong>Tempo Settings</strong> &rarr;{' '}
+                <strong>Data Access</strong> &rarr; <strong>API Integration</strong>
+                <div className="mt-1 ml-1 space-y-1">
+                  {!siteUrl && (
+                    <Input
+                      value={siteInput || 'your-org.atlassian.net'}
+                      onFocus={() => {
+                        if (!siteInput) setSiteInput('your-org.atlassian.net')
+                      }}
+                      onChange={(e) => setSiteInput(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  )}
+                  {tempoSettingsUrl ? (
+                    <a
+                      href={tempoSettingsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary inline-flex items-center gap-0.5 text-xs underline break-all"
+                    >
+                      {tempoSettingsDisplay}
+                      <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                  ) : (
+                    <code className="text-muted-foreground block text-xs select-all break-all">
+                      {tempoSettingsDisplay}
+                    </code>
+                  )}
+                </div>
               </li>
               <li>
                 Click <strong>New Token</strong>
