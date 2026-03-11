@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -31,8 +31,13 @@ export function CustomInputForm({ open, onOpenChange, item, onSave }: Props) {
   const [duration, setDuration] = useState('')
   const [timeUnit, setTimeUnit] = useState('hours')
   const [startTime, setStartTime] = useState(todayDatetimeLocal())
+  const [prevKey, setPrevKey] = useState<{ item: typeof item; open: boolean }>({
+    item,
+    open,
+  })
 
-  useEffect(() => {
+  if (item !== prevKey.item || open !== prevKey.open) {
+    setPrevKey({ item, open })
     if (item) {
       setInput(item.input)
       setDuration(String(item.duration))
@@ -51,7 +56,7 @@ export function CustomInputForm({ open, onOpenChange, item, onSave }: Props) {
       setTimeUnit('hours')
       setStartTime(todayDatetimeLocal())
     }
-  }, [item, open])
+  }
 
   const parsedDuration = parseFloat(duration)
   const canSave = input.trim() && startTime && !isNaN(parsedDuration) && parsedDuration > 0

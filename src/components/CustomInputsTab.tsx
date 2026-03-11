@@ -25,8 +25,6 @@ export function CustomInputsTab() {
   const addItem = useCustomInputsStore((s) => s.addItem)
   const updateItem = useCustomInputsStore((s) => s.updateItem)
   const deleteItem = useCustomInputsStore((s) => s.deleteItem)
-  const getPeriod = useCustomInputsStore((s) => s.getPeriod)
-
   const periodMode = useCustomInputsStore((s) => s.periodMode)
   const selectedDate = useCustomInputsStore((s) => s.selectedDate)
   const customStart = useCustomInputsStore((s) => s.customStart)
@@ -40,7 +38,7 @@ export function CustomInputsTab() {
 
   const reload = useCallback(() => {
     if (isReady) loadItems()
-  }, [isReady, loadItems, getPeriod])
+  }, [isReady, loadItems])
 
   useEffect(() => {
     reload()

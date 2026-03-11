@@ -150,11 +150,7 @@ function GCalTab() {
 
   const gisReady = useGisReady()
   const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null)
-  const [clientIdInput, setClientIdInput] = useState('')
-
-  useEffect(() => {
-    setClientIdInput(readPersonalClientId())
-  }, [])
+  const [clientIdInput, setClientIdInput] = useState(() => readPersonalClientId())
 
   const hasOrgMethod = !!GCAL_ORG_CLIENT_ID
 

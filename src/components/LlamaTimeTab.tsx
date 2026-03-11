@@ -434,14 +434,13 @@ export function LlamaTimeTab() {
   const [connectDialogOpen, setConnectDialogOpen] = useState(false)
 
   // Auto-open dialog only after all auth checks have resolved with no connections
-  const hasAutoOpened = useRef(false)
-  useEffect(() => {
-    if (isMockMode || hasAutoOpened.current || !allAuthChecked) return
+  const [hasAutoOpened, setHasAutoOpened] = useState(false)
+  if (!isMockMode && !hasAutoOpened && allAuthChecked) {
     if (aggregateStatus === 'none') {
       setConnectDialogOpen(true)
     }
-    hasAutoOpened.current = true
-  }, [aggregateStatus, allAuthChecked, isMockMode])
+    setHasAutoOpened(true)
+  }
 
   // Load all data when period or readiness changes
   useEffect(() => {
@@ -559,6 +558,11 @@ export function LlamaTimeTab() {
   const totalMinutes = daysInMonth * effectiveMinutesPerDay
 
   const [visibleDays, setVisibleDays] = useState(14)
+  const [prevDaysInMonth, setPrevDaysInMonth] = useState(daysInMonth)
+  if (daysInMonth !== prevDaysInMonth) {
+    setPrevDaysInMonth(daysInMonth)
+    setVisibleDays(14)
+  }
   const visibleFraction = visibleDays / daysInMonth
   const chartWidthPercent = (daysInMonth / visibleDays) * 100
 
@@ -615,11 +619,6 @@ export function LlamaTimeTab() {
     },
     [daysInMonth],
   )
-
-  // Reset visibleDays when month changes
-  useEffect(() => {
-    setVisibleDays(14)
-  }, [daysInMonth])
 
   // Pinch-to-zoom (trackpad) and Cmd+scroll zoom — adjusts by ±1 day
   const lastZoomTime = useRef(0)

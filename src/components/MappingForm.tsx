@@ -1,4 +1,4 @@
-import { useState, useEffect, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -21,8 +21,13 @@ export function MappingForm({ open, onOpenChange, item, onSave }: Props) {
   const [issueKey, setIssueKey] = useState('')
   const [issueName, setIssueName] = useState('')
   const [projectKey, setProjectKey] = useState('')
+  const [prevKey, setPrevKey] = useState<{ item: typeof item; open: boolean }>({
+    item,
+    open,
+  })
 
-  useEffect(() => {
+  if (item !== prevKey.item || open !== prevKey.open) {
+    setPrevKey({ item, open })
     if (item) {
       setKeywords(item.key_words)
       setIssueKey(item.issue_key)
@@ -35,7 +40,7 @@ export function MappingForm({ open, onOpenChange, item, onSave }: Props) {
       setProjectKey('')
     }
     setKeywordInput('')
-  }, [item, open])
+  }
 
   const addKeyword = () => {
     const kw = keywordInput.trim()
