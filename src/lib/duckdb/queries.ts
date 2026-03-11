@@ -575,6 +575,30 @@ export async function upsertTasksWithMappings(tasks: DdsTask[]): Promise<void> {
   await syncTimesheetForTasks(tasks)
 }
 
+// ── Single-task update ───────────────────────────────────────────────
+
+export interface TaskUpdate {
+  issue_key?: string | null
+  issue_name?: string | null
+  project_key?: string | null
+  duration?: string
+}
+
+export async function updateTask(taskId: string, fields: TaskUpdate): Promise<void> {
+  const sets: string[] = []
+  if ('issue_key' in fields) sets.push(`issue_key = ${escSql(fields.issue_key)}`)
+  if ('issue_name' in fields) sets.push(`issue_name = ${escSql(fields.issue_name)}`)
+  if ('project_key' in fields) sets.push(`project_key = ${escSql(fields.project_key)}`)
+  if ('duration' in fields) sets.push(`duration = ${escSql(fields.duration)}`)
+  if (sets.length === 0) return
+  await exec(`UPDATE dds_tasks SET ${sets.join(', ')} WHERE task_id = ${escSql(taskId)}`)
+  const result = await exec(
+    `SELECT * FROM dds_tasks WHERE task_id = ${escSql(taskId)} ORDER BY revision DESC LIMIT 1`,
+  )
+  const rows = result.toArray().map((r) => r.toJSON() as DdsTask)
+  if (rows.length > 0) await syncTimesheetForTasks(rows)
+}
+
 export async function customInputToTask(input: DdsCustomInput, revision: number): Promise<void> {
   const task: DdsTask = {
     task_id: input.id,

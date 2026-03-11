@@ -5,26 +5,64 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 
 /**
- * Shared GIS token client — initialised once by `useGoogleCalendarConnect`,
+ * Shared GIS token client — lazily initialised by `ensureTokenClient`,
  * reused by `trySilentGCalRefresh` for background renewal.
  */
 let sharedTokenClient: google.accounts.oauth2.TokenClient | null = null
+let sharedClientId: string | null = null
+
+/**
+ * Lazily initialise (or reuse) a GIS token client that matches the
+ * currently-active calendar auth method. Returns null when GIS isn't
+ * loaded or the required client-ID is missing.
+ */
+function ensureTokenClient(): google.accounts.oauth2.TokenClient | null {
+  if (!window.google?.accounts?.oauth2) return null
+
+  const { authMethod, personalClientId } = useCalendarStore.getState()
+  const clientId = authMethod === 'personal' ? personalClientId : CLIENT_ID
+  if (!clientId) return null
+
+  // Reuse when the client-ID hasn't changed
+  if (sharedTokenClient && sharedClientId === clientId) return sharedTokenClient
+
+  sharedTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: SCOPES,
+    callback: (response) => {
+      if (response.error) {
+        useCalendarStore.getState().setStatus('error')
+        return
+      }
+      const method = useCalendarStore.getState().authMethod ?? 'org'
+      useCalendarStore.getState().setConnected(
+        response.access_token,
+        Number(response.expires_in) || 3600,
+        method,
+      )
+    },
+    error_callback: () => {
+      useCalendarStore.getState().setStatus('error')
+    },
+  })
+  sharedClientId = clientId
+  return sharedTokenClient
+}
 
 /**
  * Attempt a silent (no-popup) token refresh via Google Identity Services.
  * Returns `true` if the refresh succeeded, `false` otherwise.
  */
 export function trySilentGCalRefresh(): Promise<boolean> {
-  if (!sharedTokenClient) return Promise.resolve(false)
+  const client = ensureTokenClient()
+  if (!client) return Promise.resolve(false)
 
   return new Promise((resolve) => {
-    // GIS calls the callback/error_callback configured at init time,
-    // but we need a one-shot result here — so we wrap in a timeout.
     const timeout = setTimeout(() => resolve(false), 10_000)
 
     // `prompt: ''` skips the consent popup (works when user already granted)
     try {
-      sharedTokenClient!.requestAccessToken({ prompt: '' })
+      client.requestAccessToken({ prompt: '' })
     } catch {
       clearTimeout(timeout)
       resolve(false)

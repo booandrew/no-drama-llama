@@ -9,6 +9,7 @@ interface TempoState {
   status: TempoStatus
   connectionHealth: ConnectionHealth
   error: string | null
+  _authChecked: boolean
 
   setToken: (token: string) => Promise<void>
   setStatus: (status: TempoStatus) => void
@@ -22,6 +23,7 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
   status: 'idle',
   connectionHealth: 'unknown',
   error: null,
+  _authChecked: false,
 
   setToken: async (token) => {
     logAction('connection', 'success', 'Connected to Tempo')
@@ -67,6 +69,8 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
       }
     } catch {
       // offline or not deployed yet
+    } finally {
+      set({ _authChecked: true })
     }
   },
 

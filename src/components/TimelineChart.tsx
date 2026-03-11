@@ -12,11 +12,9 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { mockDdsJiraIssues } from '@/lib/mock-data'
-import { useAppStore } from '@/store/app'
-import type { CalendarEvent } from '@/store/calendar'
-import { useJiraStore } from '@/store/jira'
+import type { DdsJiraIssue, DdsTask, TaskUpdate } from '@/lib/duckdb/queries'
 
 const MINUTES_PER_DAY = 1440
 
@@ -24,7 +22,9 @@ const BAR_COLOR = 'var(--chart-1)'
 const MIN_BAR_PX = 3
 
 interface TimelineChartProps {
-  events: CalendarEvent[]
+  tasks: DdsTask[]
+  issues?: DdsJiraIssue[]
+  onTaskUpdate?: (taskId: string, fields: TaskUpdate) => void
   year: number
   month: number
   domain?: [number, number]
@@ -32,23 +32,32 @@ interface TimelineChartProps {
   hideXAxis?: boolean
   effectiveMinutesPerDay?: number
   workStartMinute?: number
+  barColors?: string[]
 }
 
 interface SegmentMeta {
   name: string
+  taskId: string
+  issueKey: string | null
+  issueName: string | null
+  projectKey: string | null
+  duration: string
   startTime: Date
   endTime: Date
   durationMin: number
   solid: boolean
+  readOnly: boolean
 }
 
-function toMinuteOffset(
-  dt: { dateTime?: string; date?: string } | undefined,
-  monthStartMs: number,
-): number {
-  if (!dt) return 0
-  const ms = new Date(dt.dateTime ?? dt.date ?? 0).getTime()
-  return Math.max(0, Math.round((ms - monthStartMs) / 60000))
+function parseDuration(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+  }
+  // Raw seconds (e.g. "28800" from Jira API timeSpentSeconds)
+  const n = Number(dur)
+  return n > 0 ? Math.round(n / 60) : 0
 }
 
 function remapMinutes(absoluteMin: number, effectiveMpd: number, workStartMin: number): number {
@@ -65,8 +74,22 @@ function formatDuration(minutes: number): string {
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
 }
 
+function minutesToDurationStr(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h > 0 && m > 0) return `${h}h${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
+
+function sourceTypeOrder(source: string): number {
+  if (source === 'jira_worklog') return 0
+  if (source === 'custom_input') return 1
+  return 2
+}
+
 function buildChartData(
-  events: CalendarEvent[],
+  tasks: DdsTask[],
   year: number,
   month: number,
   effectiveMpd: number,
@@ -77,15 +100,38 @@ function buildChartData(
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const totalMinutes = daysInMonth * effectiveMpd
 
-  const grouped = new Map<string, CalendarEvent[]>()
-  for (const e of events) {
-    const name = e.summary ?? '(no title)'
-    const list = grouped.get(name) ?? []
-    list.push(e)
-    grouped.set(name, list)
+  // Group by source-dependent key
+  const grouped = new Map<string, DdsTask[]>()
+  for (const t of tasks) {
+    const desc = t.description ?? '(no title)'
+    const typeOrd = sourceTypeOrder(t.source)
+    let key: string
+    if (typeOrd === 0) {
+      key = `wl::${t.issue_key ?? desc}`
+    } else if (typeOrd === 1) {
+      key = `ci::${desc}`
+    } else {
+      key = `cal::${desc}::${t.issue_key ?? ''}`
+    }
+    const list = grouped.get(key) ?? []
+    list.push(t)
+    grouped.set(key, list)
   }
 
-  const taskNames = Array.from(grouped.keys()).sort()
+  // Sort: type group order, then mapped first, then alpha
+  const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
+    const aType = sourceTypeOrder(grouped.get(a)![0].source)
+    const bType = sourceTypeOrder(grouped.get(b)![0].source)
+    if (aType !== bType) return aType - bType
+    const aIssue = grouped.get(a)![0].issue_key
+    const bIssue = grouped.get(b)![0].issue_key
+    if (!!aIssue !== !!bIssue) return aIssue ? -1 : 1
+    const aName = grouped.get(a)![0].description ?? '(no title)'
+    const bName = grouped.get(b)![0].description ?? '(no title)'
+    return aName.localeCompare(bName)
+  })
+
+  const taskNames = sortedKeys.map((k) => grouped.get(k)![0].description ?? '(no title)')
 
   let maxSlots = 0
   for (const list of grouped.values()) {
@@ -94,20 +140,24 @@ function buildChartData(
 
   const segmentMeta: Map<string, SegmentMeta> = new Map()
 
-  const data = taskNames.map((name) => {
-    const occurrences = grouped.get(name)!
-    const sorted = [...occurrences].sort((a, b) => {
-      const aMs = new Date(a.start?.dateTime ?? a.start?.date ?? 0).getTime()
-      const bMs = new Date(b.start?.dateTime ?? b.start?.date ?? 0).getTime()
-      return aMs - bMs
-    })
+  const data = sortedKeys.map((groupKey, rowIdx) => {
+    const occurrences = grouped.get(groupKey)!
+    const displayName = occurrences[0].description ?? '(no title)'
+    const isReadOnly = occurrences[0].source === 'jira_worklog'
+    const sorted = [...occurrences].sort((a, b) =>
+      String(a.start_time ?? '').localeCompare(String(b.start_time ?? '')),
+    )
 
-    const row: Record<string, string | number> = { name }
+    const row: Record<string, string | number> = { name: displayName, _rowIdx: rowIdx }
     let cursor = 0
 
-    sorted.forEach((event, i) => {
-      const startMin = remapMinutes(toMinuteOffset(event.start, monthStartMs), effectiveMpd, workStartMin)
-      const endMin = remapMinutes(toMinuteOffset(event.end, monthStartMs), effectiveMpd, workStartMin)
+    sorted.forEach((task, i) => {
+      const durationMin = parseDuration(task.duration)
+      const taskStartMs = task.start_time ? new Date(task.start_time).getTime() : 0
+      const rawStartMin = Math.max(0, Math.round((taskStartMs - monthStartMs) / 60000))
+      const startMin = remapMinutes(rawStartMin, effectiveMpd, workStartMin)
+      const rawEndMin = rawStartMin + durationMin
+      const endMin = remapMinutes(rawEndMin, effectiveMpd, workStartMin)
       const clampedStart = Math.max(0, Math.min(totalMinutes, startMin))
       const clampedEnd = Math.max(0, Math.min(totalMinutes, endMin))
       const gap = Math.max(0, clampedStart - cursor)
@@ -117,12 +167,18 @@ function buildChartData(
       row[`event_${i}`] = duration
       cursor = clampedStart + duration
 
-      segmentMeta.set(`${name}::event_${i}`, {
-        name,
-        startTime: new Date(event.start?.dateTime ?? event.start?.date ?? 0),
-        endTime: new Date(event.end?.dateTime ?? event.end?.date ?? 0),
+      segmentMeta.set(`${rowIdx}::event_${i}`, {
+        name: displayName,
+        taskId: task.task_id,
+        issueKey: task.issue_key,
+        issueName: task.issue_name,
+        projectKey: task.project_key,
+        duration: task.duration,
+        startTime: new Date(task.start_time),
+        endTime: new Date(taskStartMs + durationMin * 60000),
         durationMin: duration,
-        solid: Math.random() > 0.5,
+        solid: !!task.issue_key,
+        readOnly: isReadOnly,
       })
     })
 
@@ -156,18 +212,47 @@ const QUICK_LOG_OPTIONS = [
 
 function EventDetailDialog({
   meta,
+  issues,
+  onTaskUpdate,
   onClose,
 }: {
   meta: SegmentMeta
+  issues: DdsJiraIssue[]
+  onTaskUpdate?: (taskId: string, fields: TaskUpdate) => void
   onClose: () => void
 }) {
-  const isMockMode = useAppStore((s) => s.isMockMode)
-  const jiraIssues = useJiraStore((s) => s.issues)
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(meta.issueKey)
+  const currentMin = parseDuration(meta.duration)
+  const [durationInput, setDurationInput] = useState(meta.duration)
 
-  const issues = isMockMode
-    ? mockDdsJiraIssues.map((i) => ({ key: i.issue_key, summary: i.issue_name }))
-    : jiraIssues.map((i) => ({ key: i.key, summary: i.summary }))
+  const issueItems = issues.map((i) => ({ key: i.issue_key, summary: i.issue_name }))
+
+  const handleIssueChange = (val: string | null) => {
+    setSelectedIssue(val)
+    if (!onTaskUpdate) return
+    const issue = issues.find((i) => i.issue_key === val)
+    onTaskUpdate(meta.taskId, {
+      issue_key: val,
+      issue_name: issue?.issue_name ?? null,
+      project_key: issue?.project_key ?? null,
+    })
+  }
+
+  const handleDurationBlur = () => {
+    if (!onTaskUpdate) return
+    const parsed = parseDuration(durationInput)
+    if (parsed > 0 && durationInput !== meta.duration) {
+      onTaskUpdate(meta.taskId, { duration: minutesToDurationStr(parsed) })
+    }
+  }
+
+  const handleQuickLog = (addMinutes: number) => {
+    if (!onTaskUpdate) return
+    const newMin = currentMin + addMinutes
+    const newDur = minutesToDurationStr(newMin)
+    setDurationInput(newDur)
+    onTaskUpdate(meta.taskId, { duration: newDur })
+  }
 
   return (
     <Dialog open onOpenChange={(open: boolean) => { if (!open) onClose() }}>
@@ -194,7 +279,13 @@ function EventDetailDialog({
               <span className="text-muted-foreground text-xs uppercase tracking-wide shrink-0">
                 Duration
               </span>
-              <span className="font-medium text-right">{formatDuration(meta.durationMin)}</span>
+              <Input
+                value={durationInput}
+                onChange={(e) => setDurationInput(e.target.value)}
+                onBlur={handleDurationBlur}
+                disabled={meta.readOnly}
+                className="h-7 w-24 text-right text-sm font-medium"
+              />
             </div>
           </div>
 
@@ -205,13 +296,14 @@ function EventDetailDialog({
             </span>
             <Combobox
               value={selectedIssue}
-              onValueChange={(val) => setSelectedIssue(val as string | null)}
+              onValueChange={(val) => handleIssueChange(val as string | null)}
+              disabled={meta.readOnly}
             >
-              <ComboboxInput placeholder="Search issues..." className="h-9 w-full" />
+              <ComboboxInput placeholder="Search issues..." className="h-9 w-full" disabled={meta.readOnly} />
               <ComboboxContent>
                 <ComboboxList>
                   <ComboboxEmpty>No issues found</ComboboxEmpty>
-                  {issues.map((issue) => (
+                  {issueItems.map((issue) => (
                     <ComboboxItem key={issue.key} value={issue.key}>
                       <span className="font-medium">{issue.key}</span>
                       <span className="text-muted-foreground truncate">{issue.summary}</span>
@@ -222,27 +314,29 @@ function EventDetailDialog({
             </Combobox>
           </div>
 
-          <Separator />
+          {!meta.readOnly && (
+            <>
+              <Separator />
 
-          {/* Quick Log Add */}
-          <div className="flex flex-col gap-2">
-            <span className="text-muted-foreground text-xs uppercase tracking-wide">
-              Quick Log Add
-            </span>
-            <div className="flex gap-2">
-              {QUICK_LOG_OPTIONS.map((opt) => (
-                <button
-                  key={opt.label}
-                  className="rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => {
-                    // TODO: add timelog bar with the selected issue
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
+              {/* Quick Log Add */}
+              <div className="flex flex-col gap-2">
+                <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                  Quick Log Add
+                </span>
+                <div className="flex gap-2">
+                  {QUICK_LOG_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.label}
+                      className="rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => handleQuickLog(opt.minutes)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -250,7 +344,9 @@ function EventDetailDialog({
 }
 
 export function TimelineChart({
-  events,
+  tasks,
+  issues,
+  onTaskUpdate,
   year,
   month,
   domain,
@@ -258,13 +354,14 @@ export function TimelineChart({
   hideXAxis,
   effectiveMinutesPerDay,
   workStartMinute,
+  barColors,
 }: TimelineChartProps) {
   const effectiveMpd = effectiveMinutesPerDay ?? MINUTES_PER_DAY
   const workStartMin = workStartMinute ?? 0
 
   const { data, taskNames, maxSlots, totalMinutes, segmentMeta } = useMemo(
-    () => buildChartData(events, year, month, effectiveMpd, workStartMin),
-    [events, year, month, effectiveMpd, workStartMin],
+    () => buildChartData(tasks, year, month, effectiveMpd, workStartMin),
+    [tasks, year, month, effectiveMpd, workStartMin],
   )
 
   const chartConfig = useMemo(() => {
@@ -392,14 +489,15 @@ export function TimelineChart({
                     y: number
                     width: number
                     height: number
-                    payload: { name: string }
+                    payload: { name: string; _rowIdx: number }
                   }
                   if (!width || width <= 0) return <rect />
-                  const metaKey = `${payload.name}::event_${i}`
+                  const metaKey = `${payload._rowIdx}::event_${i}`
                   const meta = segmentMeta.get(metaKey)
                   const isSolid = meta?.solid ?? true
                   const w = Math.max(MIN_BAR_PX, width)
                   const barX = width < MIN_BAR_PX ? x - (MIN_BAR_PX - width) / 2 : x
+                  const rowColor = barColors?.[payload._rowIdx] ?? BAR_COLOR
                   return (
                     <rect
                       x={isSolid ? barX : barX + 1}
@@ -407,8 +505,8 @@ export function TimelineChart({
                       width={isSolid ? w : Math.max(0, w - 2)}
                       height={isSolid ? height : Math.max(0, height - 2)}
                       rx={4}
-                      fill={BAR_COLOR}
-                      stroke={isSolid ? 'none' : BAR_COLOR}
+                      fill={rowColor}
+                      stroke={isSolid ? 'none' : rowColor}
                       strokeWidth={isSolid ? 0 : 1}
                       fillOpacity={isSolid ? 1 : 0.3}
                       strokeOpacity={isSolid ? 0 : 1}
@@ -474,6 +572,8 @@ export function TimelineChart({
       {selectedMeta && (
         <EventDetailDialog
           meta={selectedMeta}
+          issues={issues ?? []}
+          onTaskUpdate={onTaskUpdate}
           onClose={() => setSelectedMeta(null)}
         />
       )}

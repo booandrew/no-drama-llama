@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 import type { DdsCustomInput } from '@/lib/duckdb/queries'
 import { logAction } from '@/store/activity-log'
@@ -42,63 +43,76 @@ interface CustomInputsState {
   deleteItem: (id: string) => Promise<void>
 }
 
-export const useCustomInputsStore = create<CustomInputsState>()((set, get) => ({
-  periodMode: 'day',
-  selectedDate: todayISO(),
-  customStart: null,
-  customEnd: null,
+export const useCustomInputsStore = create<CustomInputsState>()(
+  persist(
+    (set, get) => ({
+      periodMode: 'day',
+      selectedDate: todayISO(),
+      customStart: null,
+      customEnd: null,
 
-  items: [],
-  loading: false,
+      items: [],
+      loading: false,
 
-  setPeriodMode: (periodMode) => set({ periodMode }),
-  setSelectedDate: (selectedDate) => set({ selectedDate }),
+      setPeriodMode: (periodMode) => set({ periodMode }),
+      setSelectedDate: (selectedDate) => set({ selectedDate }),
 
-  setCustomRange: (start, end) => {
-    if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
-      return 'Custom period cannot exceed 3 months'
-    }
-    if (new Date(end) <= new Date(start)) {
-      return 'End date must be after start date'
-    }
-    set({ customStart: start, customEnd: end })
-    return null
-  },
+      setCustomRange: (start, end) => {
+        if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
+          return 'Custom period cannot exceed 3 months'
+        }
+        if (new Date(end) <= new Date(start)) {
+          return 'End date must be after start date'
+        }
+        set({ customStart: start, customEnd: end })
+        return null
+      },
 
-  getPeriod: () => computePeriod(get()),
+      getPeriod: () => computePeriod(get()),
 
-  loadItems: async () => {
-    set({ loading: true })
-    try {
-      const { start, end } = get().getPeriod()
-      const items = await readDdsCustomInputs(start, end)
-      set({ items })
-    } finally {
-      set({ loading: false })
-    }
-  },
+      loadItems: async () => {
+        set({ loading: true })
+        try {
+          const { start, end } = get().getPeriod()
+          const items = await readDdsCustomInputs(start, end)
+          set({ items })
+        } finally {
+          set({ loading: false })
+        }
+      },
 
-  addItem: async (item) => {
-    const id = crypto.randomUUID()
-    const fullItem: DdsCustomInput = { ...item, id }
-    await upsertDdsCustomInputs([fullItem])
-    const revision = await nextTaskRevision()
-    await customInputToTask(fullItem, revision)
-    await get().loadItems()
-    logAction('input', 'success', 'Added custom time entry')
-  },
+      addItem: async (item) => {
+        const id = crypto.randomUUID()
+        const fullItem: DdsCustomInput = { ...item, id }
+        await upsertDdsCustomInputs([fullItem])
+        const revision = await nextTaskRevision()
+        await customInputToTask(fullItem, revision)
+        await get().loadItems()
+        logAction('input', 'success', 'Added custom time entry')
+      },
 
-  updateItem: async (item) => {
-    await upsertDdsCustomInputs([item])
-    const revision = await nextTaskRevision()
-    await customInputToTask(item, revision)
-    await get().loadItems()
-    logAction('input', 'success', 'Updated custom time entry')
-  },
+      updateItem: async (item) => {
+        await upsertDdsCustomInputs([item])
+        const revision = await nextTaskRevision()
+        await customInputToTask(item, revision)
+        await get().loadItems()
+        logAction('input', 'success', 'Updated custom time entry')
+      },
 
-  deleteItem: async (id) => {
-    await deleteDdsCustomInput(id)
-    await get().loadItems()
-    logAction('input', 'success', 'Deleted custom time entry')
-  },
-}))
+      deleteItem: async (id) => {
+        await deleteDdsCustomInput(id)
+        await get().loadItems()
+        logAction('input', 'success', 'Deleted custom time entry')
+      },
+    }),
+    {
+      name: 'custom-inputs-period',
+      partialize: (state) => ({
+        periodMode: state.periodMode,
+        selectedDate: state.selectedDate,
+        customStart: state.customStart,
+        customEnd: state.customEnd,
+      }),
+    },
+  ),
+)

@@ -19,7 +19,9 @@ interface JiraState {
   authMethod: JiraAuthMethod
   cloudId: string | null
   accountId: string | null
+  siteUrl: string | null
   connectionHealth: ConnectionHealth
+  _authChecked: boolean
   expiresAt: number | null
 
   issues: JiraIssue[]
@@ -47,7 +49,9 @@ export const useJiraStore = create<JiraState>()(
       authMethod: 'oauth-org',
       cloudId: null,
       accountId: null,
+      siteUrl: null,
       connectionHealth: 'unknown',
+      _authChecked: false,
       expiresAt: null,
 
       _hasHydrated: false,
@@ -69,6 +73,7 @@ export const useJiraStore = create<JiraState>()(
           authMethod: 'oauth-org',
           cloudId: null,
           accountId: null,
+          siteUrl: null,
           status: 'idle',
           connectionHealth: 'unknown',
           issues: [],
@@ -178,6 +183,7 @@ export const useJiraStore = create<JiraState>()(
           set({
             authMethod: 'token',
             accountId: data.accountId,
+            siteUrl: siteUrl,
             status: 'connected',
             connectionHealth: 'healthy',
             error: null,
@@ -201,6 +207,7 @@ export const useJiraStore = create<JiraState>()(
               authMethod: data.authMethod ?? 'oauth-org',
               accountId: data.accountId ?? null,
               cloudId: data.cloudId ?? null,
+              siteUrl: data.siteUrl ?? null,
             })
             get().checkHealth()
           } else {
@@ -208,6 +215,8 @@ export const useJiraStore = create<JiraState>()(
           }
         } catch {
           // offline or not deployed yet — keep current state
+        } finally {
+          set({ _authChecked: true })
         }
       },
 
@@ -250,6 +259,7 @@ export const useJiraStore = create<JiraState>()(
         authMethod: state.authMethod,
         cloudId: state.cloudId,
         accountId: state.accountId,
+        siteUrl: state.siteUrl,
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error) state?.setHydrated()

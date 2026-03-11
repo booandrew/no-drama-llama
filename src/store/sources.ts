@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export type PeriodMode = 'day' | 'week' | 'month' | 'custom'
 export type SourceSubtab = 'jira-issues' | 'jira-worklogs' | 'gcal-events' | 'tempo-capacity'
@@ -79,34 +80,47 @@ interface SourcesState {
   getPeriod: () => { start: string; end: string }
 }
 
-export const useSourcesStore = create<SourcesState>()((set, get) => ({
-  periodMode: 'month',
-  selectedDate: todayISO(),
-  customStart: null,
-  customEnd: null,
-  activeSubtab: 'jira-issues',
-  activeView: 'data',
-  syncing: {},
+export const useSourcesStore = create<SourcesState>()(
+  persist(
+    (set, get) => ({
+      periodMode: 'month',
+      selectedDate: todayISO(),
+      customStart: null,
+      customEnd: null,
+      activeSubtab: 'jira-issues',
+      activeView: 'data',
+      syncing: {},
 
-  setPeriodMode: (periodMode) => set({ periodMode }),
-  setSelectedDate: (selectedDate) => set({ selectedDate }),
+      setPeriodMode: (periodMode) => set({ periodMode }),
+      setSelectedDate: (selectedDate) => set({ selectedDate }),
 
-  setCustomRange: (start, end) => {
-    if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
-      return 'Custom period cannot exceed 3 months'
-    }
-    if (new Date(end) <= new Date(start)) {
-      return 'End date must be after start date'
-    }
-    set({ customStart: start, customEnd: end })
-    return null
-  },
+      setCustomRange: (start, end) => {
+        if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
+          return 'Custom period cannot exceed 3 months'
+        }
+        if (new Date(end) <= new Date(start)) {
+          return 'End date must be after start date'
+        }
+        set({ customStart: start, customEnd: end })
+        return null
+      },
 
-  setActiveSubtab: (activeSubtab) => set({ activeSubtab }),
-  setActiveView: (activeView) => set({ activeView }),
+      setActiveSubtab: (activeSubtab) => set({ activeSubtab }),
+      setActiveView: (activeView) => set({ activeView }),
 
-  setSyncing: (source, loading) =>
-    set((state) => ({ syncing: { ...state.syncing, [source]: loading } })),
+      setSyncing: (source, loading) =>
+        set((state) => ({ syncing: { ...state.syncing, [source]: loading } })),
 
-  getPeriod: () => computePeriod(get()),
-}))
+      getPeriod: () => computePeriod(get()),
+    }),
+    {
+      name: 'sources-period',
+      partialize: (state) => ({
+        periodMode: state.periodMode,
+        selectedDate: state.selectedDate,
+        customStart: state.customStart,
+        customEnd: state.customEnd,
+      }),
+    },
+  ),
+)

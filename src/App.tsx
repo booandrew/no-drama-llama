@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
@@ -17,15 +17,9 @@ import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getProjectTotals, PROJECT_COLORS } from '@/components/insights/mock-data'
 import { useConnectionHealth } from '@/hooks/use-connection-health'
-import { useDuckDB } from '@/lib/duckdb'
-import { getLatestDataMonth } from '@/lib/duckdb/latest-data-month'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
-
-import { useCustomInputsStore } from '@/store/custom-inputs'
 import { useJiraStore } from '@/store/jira'
-
-import { useSourcesStore } from '@/store/sources'
 
 const summaryChartConfig = {
   hours: { label: 'Hours', color: 'var(--chart-1)' },
@@ -180,7 +174,6 @@ function SummaryCard() {
 
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
-  const isMockMode = useAppStore((s) => s.isMockMode)
   const jiraExchangeCode = useJiraStore((s) => s.exchangeCode)
   const jiraHydrated = useJiraStore((s) => s._hasHydrated)
   const setHasSeenLanding = useAppStore((s) => s.setHasSeenLanding)
@@ -209,33 +202,6 @@ function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
-
-  const { isReady: isDuckDbReady } = useDuckDB()
-  const hasAutoSelected = useRef(false)
-
-  useEffect(() => {
-    if (hasAutoSelected.current) return
-    if (!isMockMode && !isDuckDbReady) return
-
-    hasAutoSelected.current = true
-
-    getLatestDataMonth(isMockMode).then((period) => {
-      const now = new Date()
-      const isCurrentMonth = period.year === now.getFullYear() && period.month === now.getMonth()
-      if (isCurrentMonth) return
-
-      // Calendar store: only override if still on current month (user hasn't changed it)
-      const calPeriod = useCalendarStore.getState().selectedPeriod
-      if (calPeriod.year === now.getFullYear() && calPeriod.month === now.getMonth()) {
-        useCalendarStore.getState().setSelectedPeriod(period)
-      }
-
-      // Sources & custom inputs: always set (not persisted, resets on reload)
-      const firstDay = `${period.year}-${String(period.month + 1).padStart(2, '0')}-01`
-      useSourcesStore.getState().setSelectedDate(firstDay)
-      useCustomInputsStore.getState().setSelectedDate(firstDay)
-    })
-  }, [isMockMode, isDuckDbReady])
 
   if (page === 'landing') {
     return <LandingPage onEnterApp={goToApp} />

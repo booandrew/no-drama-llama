@@ -67,13 +67,14 @@ function handleStatus(request: Request): Response {
   const authMethod = getCookie(request, 'jira_auth_method')
   const accountId = getCookie(request, 'jira_account_id')
   const cloudId = getCookie(request, 'jira_cloud_id')
+  const siteUrl = getCookie(request, 'jira_site_url')
 
   const connected = !!authMethod && (!!getCookie(request, 'jira_access_token') ||
     !!getCookie(request, 'jira_refresh_token') ||
     !!getCookie(request, 'jira_api_token'))
 
   return new Response(
-    JSON.stringify({ connected, authMethod, accountId, cloudId }),
+    JSON.stringify({ connected, authMethod, accountId, cloudId, siteUrl }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 }

@@ -25,7 +25,7 @@ export function useConnectionHealth() {
       const jiraStatus = useJiraStore.getState().status
       const tempoStatus = useTempoStore.getState().status
 
-      if (isConnected(calStatus) || calStatus === 'expired') {
+      if (isConnected(calStatus) || calStatus === 'expired' || calStatus === 'error') {
         useCalendarStore.getState().checkHealth()
       }
       if (isConnected(jiraStatus) || jiraStatus === 'expired') {
@@ -89,4 +89,12 @@ export function useAggregateConnectionStatus(): AggregateStatus {
       c.status === 'expired',
   )
   return hasUnhealthy ? 'unhealthy' : 'healthy'
+}
+
+/** True once all three stores have completed their initial checkAuthStatus call. */
+export function useAllAuthChecked(): boolean {
+  const cal = useCalendarStore((s) => s._authChecked)
+  const jira = useJiraStore((s) => s._authChecked)
+  const tempo = useTempoStore((s) => s._authChecked)
+  return cal && jira && tempo
 }

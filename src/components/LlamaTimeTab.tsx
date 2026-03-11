@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar } from 'lucide-react'
 
+import { ManageConnectionsDialog } from '@/components/ManageConnectionsDialog'
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   Combobox,
   ComboboxContent,
-  ComboboxEmpty,
   ComboboxInput,
+  ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
 import {
@@ -18,32 +18,128 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
-import { mockDdsCalendarEvents } from '@/lib/mock-data'
+import {
+  useAggregateConnectionStatus,
+  useAllAuthChecked,
+} from '@/hooks/use-connection-health'
+import { useDuckDB } from '@/lib/duckdb/use-duckdb'
+import { Input } from '@/components/ui/input'
+import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
+import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
-import type { CalendarEvent } from '@/store/calendar'
 import { useCalendarStore } from '@/store/calendar'
+import { useTasksStore } from '@/store/tasks'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 
 const MINUTES_PER_DAY = 1440
 const WORK_START_HOUR = 7
 const WORK_END_HOUR = 20
 const WORK_MINUTES_PER_DAY = (WORK_END_HOUR - WORK_START_HOUR) * 60
 
-function hasEventsOutsideWorkHours(events: CalendarEvent[]): boolean {
+type RowType = 'worklog' | 'custom' | 'calendar'
+
+const TYPE_ORDER: RowType[] = ['worklog', 'custom', 'calendar']
+
+const TYPE_CONFIG: Record<RowType, { label: string; barColor: string; className: string }> = {
+  worklog: {
+    label: 'WL',
+    barColor: '#22c55e',
+    className: 'bg-green-500/20 text-green-700 dark:text-green-400',
+  },
+  custom: {
+    label: 'CI',
+    barColor: '#f97316',
+    className: 'bg-orange-500/20 text-orange-700 dark:text-orange-400',
+  },
+  calendar: {
+    label: 'Cal',
+    barColor: '#3b82f6',
+    className: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  },
+}
+
+function getRowType(source: string): RowType {
+  if (source === 'jira_worklog') return 'worklog'
+  if (source === 'custom_input') return 'custom'
+  return 'calendar'
+}
+
+function parseDuration(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+  }
+  // Raw seconds (e.g. "28800" from Jira API timeSpentSeconds)
+  const n = Number(dur)
+  return n > 0 ? Math.round(n / 60) : 0
+}
+
+function minutesToDurationStr(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h > 0 && m > 0) return `${h}h${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
+
+function hasTasksOutsideWorkHours(tasks: DdsTask[]): boolean {
   const wStart = WORK_START_HOUR * 60
   const wEnd = WORK_END_HOUR * 60
-  for (const e of events) {
-    if (!e.start?.dateTime) continue
-    const sd = new Date(e.start.dateTime)
+  for (const t of tasks) {
+    if (!t.start_time) continue
+    const sd = new Date(t.start_time)
     const sm = sd.getHours() * 60 + sd.getMinutes()
     if (sm < wStart || sm >= wEnd) return true
-    if (e.end?.dateTime) {
-      const ed = new Date(e.end.dateTime)
-      const em = ed.getHours() * 60 + ed.getMinutes()
-      if (em !== 0 && em > wEnd) return true
-    }
+    const em = sm + parseDuration(t.duration)
+    if (em > wEnd) return true
   }
   return false
+}
+
+/** Convert DdsJiraWorklogs to pseudo-DdsTask entries, grouped by (issue_key, day). */
+function worklogsToTasks(
+  worklogs: DdsJiraWorklog[],
+  issues: DdsJiraIssue[],
+): DdsTask[] {
+  const groups = new Map<string, { wls: DdsJiraWorklog[]; totalMin: number }>()
+  for (const wl of worklogs) {
+    const day = wl.started.split('T')[0]
+    const key = `${wl.issue_key}::${day}`
+    if (!groups.has(key)) groups.set(key, { wls: [], totalMin: 0 })
+    const g = groups.get(key)!
+    g.wls.push(wl)
+    g.totalMin += parseDuration(wl.time_spent)
+  }
+
+  const result: DdsTask[] = []
+  for (const [key, { wls, totalMin }] of groups) {
+    const first = wls[0]
+    const issue = issues.find((i) => i.issue_key === first.issue_key)
+    result.push({
+      task_id: `wl_${key}`,
+      description: issue?.issue_name ?? first.issue_key,
+      duration: minutesToDurationStr(totalMin),
+      start_time: first.started,
+      issue_key: first.issue_key,
+      issue_name: issue?.issue_name ?? null,
+      project_key: issue?.project_key ?? null,
+      revision: 0,
+      source: 'jira_worklog',
+      source_id: first.worklog_id,
+    })
+  }
+  return result
+}
+
+interface TaskGroup {
+  key: string
+  desc: string
+  issueKey: string | null
+  type: RowType
+  taskIds: string[]
+  readonly: boolean
 }
 
 const MONTH_NAMES = [
@@ -170,7 +266,7 @@ function MiniTimeline({
       blocks.push({ x, width: x2 - x })
     }
     return blocks
-  }, [weeksCount, totalMinutes])
+  }, [weeksCount, totalMinutes, daysInMonth])
 
   return (
     <div className="select-none">
@@ -213,7 +309,35 @@ export function LlamaTimeToolbar() {
   const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
-  const { isConnected } = useGoogleCalendarConnect()
+  const loadTasks = useTasksStore((s) => s.loadTasks)
+  const aggregateStatus = useAggregateConnectionStatus()
+  const [syncing, setSyncing] = useState(false)
+
+  const handleLoadSources = useCallback(async () => {
+    setSyncing(true)
+    try {
+      const { year, month } = selectedPeriod
+      const dateStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      const dateEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+      const result = await syncAll(dateStart, dateEnd)
+
+      if (result.errors.length > 0) {
+        toast.warning('Some sources failed to sync', {
+          description: result.errors.join('; '),
+        })
+      } else {
+        toast.success('Sources synced successfully')
+      }
+
+      await loadTasks(year, month)
+    } catch (e) {
+      toast.error('Sync failed', { description: (e as Error).message })
+    } finally {
+      setSyncing(false)
+    }
+  }, [selectedPeriod, loadTasks])
 
   return (
     <div className="flex flex-col gap-2">
@@ -259,11 +383,26 @@ export function LlamaTimeToolbar() {
         <div className="flex items-center gap-2">
           {isMockMode ? (
             <span className="text-muted-foreground text-xs">Mock mode — using synthetic data</span>
-          ) : isConnected ? (
-            <Button variant="default" size="sm" disabled>
-              I'm good with timelogs, Submit to JIRA
-            </Button>
-          ) : null}
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={syncing || aggregateStatus === 'none'}
+                onClick={handleLoadSources}
+              >
+                {syncing ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Load Sources
+              </Button>
+              <Button variant="default" size="sm" disabled>
+                I'm good with timelogs, Submit to JIRA
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -273,33 +412,92 @@ export function LlamaTimeToolbar() {
 // ---------------------------------------------------------------------------
 // LlamaTimeTab
 // ---------------------------------------------------------------------------
-function mockEventsForPeriod(year: number, month: number): CalendarEvent[] {
-  const start = new Date(year, month, 1).toISOString()
-  const end = new Date(year, month + 1, 1).toISOString()
-  return mockDdsCalendarEvents
-    .filter((e) => e.start_time && e.start_time >= start && e.start_time < end)
-    .map((e) => ({
-      id: e.id,
-      summary: e.summary ?? undefined,
-      start: e.start_time ? { dateTime: e.start_time } : undefined,
-      end: e.end_time ? { dateTime: e.end_time } : undefined,
-    }))
-}
-
 export function LlamaTimeTab() {
   const isMockMode = useAppStore((s) => s.isMockMode)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const realEvents = useCalendarStore((s) => s.events)
-  const eventsLoading = useCalendarStore((s) => s.eventsLoading)
-  const fetchEvents = useCalendarStore((s) => s.fetchEvents)
-  const status = useCalendarStore((s) => s.status)
-  const { connect } = useGoogleCalendarConnect()
+  const { isReady } = useDuckDB()
 
-  const events = isMockMode
-    ? mockEventsForPeriod(selectedPeriod.year, selectedPeriod.month)
-    : realEvents
+  const tasks = useTasksStore((s) => s.tasks)
+  const worklogs = useTasksStore((s) => s.worklogs)
+  const issues = useTasksStore((s) => s.issues)
+  const loading = useTasksStore((s) => s.loading)
+  const loadTasks = useTasksStore((s) => s.loadTasks)
+  const updateTask = useTasksStore((s) => s.updateTask)
+  const updateTasks = useTasksStore((s) => s.updateTasks)
 
-  const use24h = useMemo(() => hasEventsOutsideWorkHours(events), [events])
+  const aggregateStatus = useAggregateConnectionStatus()
+  const allAuthChecked = useAllAuthChecked()
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false)
+
+  // Auto-open dialog only after all auth checks have resolved with no connections
+  const hasAutoOpened = useRef(false)
+  useEffect(() => {
+    if (isMockMode || hasAutoOpened.current || !allAuthChecked) return
+    if (aggregateStatus === 'none') {
+      setConnectDialogOpen(true)
+    }
+    hasAutoOpened.current = true
+  }, [aggregateStatus, allAuthChecked, isMockMode])
+
+  // Load all data when period or readiness changes
+  useEffect(() => {
+    if (isMockMode) {
+      loadTasks(selectedPeriod.year, selectedPeriod.month)
+      return
+    }
+    if (isReady) {
+      loadTasks(selectedPeriod.year, selectedPeriod.month)
+    }
+  }, [selectedPeriod.year, selectedPeriod.month, isReady, isMockMode, loadTasks])
+
+  // Build unified task list and groups
+  const { allTasks, taskGroups, barColors } = useMemo(() => {
+    const wlTasks = worklogsToTasks(worklogs, issues)
+    const allTasks = [...tasks, ...wlTasks]
+
+    const grouped = new Map<string, TaskGroup>()
+    for (const t of allTasks) {
+      const desc = t.description ?? '(no title)'
+      const type = getRowType(t.source)
+      let key: string
+      if (type === 'worklog') {
+        key = `wl::${t.issue_key ?? desc}`
+      } else if (type === 'custom') {
+        key = `ci::${desc}`
+      } else {
+        key = `cal::${desc}`
+      }
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          desc,
+          issueKey: t.issue_key,
+          type,
+          taskIds: [],
+          readonly: type === 'worklog',
+        })
+      }
+      const g = grouped.get(key)!
+      g.taskIds.push(t.task_id)
+      if (t.issue_key && !g.issueKey) {
+        g.issueKey = t.issue_key
+      }
+    }
+
+    const groups = Array.from(grouped.values()).sort((a, b) => {
+      const aIdx = TYPE_ORDER.indexOf(a.type)
+      const bIdx = TYPE_ORDER.indexOf(b.type)
+      if (aIdx !== bIdx) return aIdx - bIdx
+      if (!!a.issueKey !== !!b.issueKey) return a.issueKey ? -1 : 1
+      return a.desc.localeCompare(b.desc)
+    })
+
+    const colors = groups.map((g) => TYPE_CONFIG[g.type].barColor)
+    return { allTasks, taskGroups: groups, barColors: colors }
+  }, [tasks, worklogs, issues])
+
+  const use24h = useMemo(() => hasTasksOutsideWorkHours(allTasks), [allTasks])
   const effectiveMinutesPerDay = use24h ? MINUTES_PER_DAY : WORK_MINUTES_PER_DAY
   const workStartMinute = use24h ? 0 : WORK_START_HOUR * 60
 
@@ -315,34 +513,17 @@ export function LlamaTimeTab() {
   const visibleFraction = visibleDays / daysInMonth
   const chartWidthPercent = (daysInMonth / visibleDays) * 100
 
-  const taskNames = useMemo(() => {
-    const names = new Set<string>()
-    for (const e of events) names.add(e.summary ?? '(no title)')
-    return Array.from(names).sort()
-  }, [events])
-
-  const isConnected =
-    isMockMode || status === 'connected' || status === 'done' || status === 'loading'
-  const prevConnected = useRef(isConnected)
-
-  useEffect(() => {
-    if (isMockMode) return
-    if (!prevConnected.current && isConnected) {
-      fetchEvents()
-    }
-    prevConnected.current = isConnected
-  }, [isConnected])
-
-  const isInitialMount = useRef(true)
-
-  useEffect(() => {
-    if (isMockMode) return
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-    if (isConnected) fetchEvents()
-  }, [selectedPeriod.year, selectedPeriod.month])
+  const handleGroupIssueChange = useCallback(
+    async (taskIds: string[], issueKey: string | null) => {
+      const issue = issues.find((i) => i.issue_key === issueKey)
+      await updateTasks(taskIds, {
+        issue_key: issueKey,
+        issue_name: issue?.issue_name ?? null,
+        project_key: issue?.project_key ?? null,
+      })
+    },
+    [issues, updateTasks],
+  )
 
   const forwardWheel = useCallback((e: React.WheelEvent) => {
     const body = chartBodyRef.current
@@ -406,28 +587,18 @@ export function LlamaTimeTab() {
     return () => el.removeEventListener('wheel', handleWheel)
   }, [daysInMonth])
 
-  if (!isConnected) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Button variant="default" size="lg" onClick={connect}>
-          <Calendar className="size-5" />
-          Connect Google Calendar
-        </Button>
-      </div>
-    )
-  }
-
-  const chartBodyHeight = Math.max(200, taskNames.length * 44 + 20)
+  const chartBodyHeight = Math.max(200, taskGroups.length * 44 + 20)
+  const hasData = allTasks.length > 0
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-4">
-      {events.length === 0 && !eventsLoading && (
+      {!hasData && !loading && (
         <p className="text-muted-foreground text-sm">
-          Select a period or click Refresh to load events.
+          Select a period or sync data to load tasks.
         </p>
       )}
 
-      {events.length > 0 && (
+      {hasData && (
         <Card className="flex flex-1 min-h-0 flex-col">
           {/* Card header: title + zoom switcher + mini-view */}
           <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
@@ -475,8 +646,13 @@ export function LlamaTimeTab() {
 
           {/* Day labels header — fixed, syncs horizontal scroll */}
           <div className="flex shrink-0 border-b">
-            <div className="flex w-[320px] shrink-0 items-center justify-between gap-2 border-r pl-3 pr-2">
-              <span className="text-xs font-medium text-muted-foreground">Name</span>
+            <div className="flex w-[356px] shrink-0 items-center gap-1.5 border-r pl-2 pr-2">
+              <span className="w-[32px] shrink-0 text-xs font-medium text-muted-foreground text-center">
+                Type
+              </span>
+              <span className="min-w-0 flex-1 text-xs font-medium text-muted-foreground">
+                Name
+              </span>
               <span className="w-[140px] shrink-0 text-xs font-medium text-muted-foreground text-center">
                 Issue code
               </span>
@@ -507,31 +683,67 @@ export function LlamaTimeTab() {
             {/* Task names column — synced vertical scroll */}
             <div
               ref={taskNamesRef}
-              className="shrink-0 w-[320px] overflow-hidden border-r bg-card z-10"
+              className="shrink-0 w-[356px] overflow-hidden border-r bg-card z-10"
               onWheel={forwardWheel}
             >
               <div className="flex flex-col" style={{ height: chartBodyHeight }}>
                 <div style={{ height: 10, flexShrink: 0 }} />
                 <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
-                  {taskNames.map((name) => (
-                    <div
-                      key={name}
-                      className="flex flex-1 items-center justify-between gap-2 pl-3 pr-2"
-                      title={name}
-                    >
-                      <span className="text-sm text-muted-foreground truncate shrink min-w-0">
-                        {name.length > 20 ? name.slice(0, 18) + '...' : name}
-                      </span>
-                      <Combobox>
-                        <ComboboxInput placeholder="—" className="h-7 w-[140px] shrink-0 text-xs" />
-                        <ComboboxContent>
-                          <ComboboxList>
-                            <ComboboxEmpty>No results</ComboboxEmpty>
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
-                    </div>
-                  ))}
+                  {taskGroups.map((group) => {
+                    const cfg = TYPE_CONFIG[group.type]
+                    return (
+                      <div
+                        key={group.key}
+                        className="flex flex-1 items-center gap-1.5 pl-2 pr-2"
+                        title={group.desc}
+                      >
+                        <span
+                          className={`w-[32px] shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
+                        >
+                          {cfg.label}
+                        </span>
+                        <span className="min-w-0 flex-1 text-sm text-muted-foreground truncate">
+                          {group.desc.length > 18 ? group.desc.slice(0, 16) + '...' : group.desc}
+                        </span>
+                        {group.readonly ? (
+                          <Input
+                            className="h-7 w-[140px] shrink-0 text-xs"
+                            value={group.issueKey ?? ''}
+                            disabled
+                          />
+                        ) : (
+                          <Combobox
+                            value={group.issueKey}
+                            onValueChange={(val) =>
+                              handleGroupIssueChange(group.taskIds, val as string | null)
+                            }
+                          >
+                            <ComboboxInput
+                              placeholder="—"
+                              className="h-7 w-[140px] shrink-0 text-xs"
+                              showClear={!!group.issueKey}
+                            />
+                            <ComboboxContent className="min-w-64">
+                              <ComboboxList>
+                                {issues.map((issue) => (
+                                  <ComboboxItem
+                                    key={issue.issue_key}
+                                    value={issue.issue_key}
+                                    className="whitespace-nowrap"
+                                  >
+                                    <span className="font-medium shrink-0">{issue.issue_key}</span>
+                                    <span className="text-muted-foreground truncate">
+                                      {issue.issue_name}
+                                    </span>
+                                  </ComboboxItem>
+                                ))}
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -545,19 +757,27 @@ export function LlamaTimeTab() {
                 }}
               >
                 <TimelineChart
-                  events={events}
+                  tasks={allTasks}
+                  issues={issues}
+                  onTaskUpdate={updateTask}
                   year={selectedPeriod.year}
                   month={selectedPeriod.month}
                   hideYAxis
                   hideXAxis
                   effectiveMinutesPerDay={effectiveMinutesPerDay}
                   workStartMinute={workStartMinute}
+                  barColors={barColors}
                 />
               </div>
             </div>
           </div>
         </Card>
       )}
+
+      <ManageConnectionsDialog
+        open={connectDialogOpen}
+        onOpenChange={setConnectDialogOpen}
+      />
     </div>
   )
 }

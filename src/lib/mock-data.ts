@@ -8,6 +8,7 @@ import type {
   DdsJiraWorklog,
   DdsCalendarEvent,
   DdsTempoDailyCapacity,
+  DdsCustomInput,
   DdsTask,
 } from '@/lib/duckdb/queries'
 
@@ -359,3 +360,53 @@ export const mockDdsTasks: DdsTask[] = mockDdsCalendarEvents.map((event) => {
     source_id: event.id,
   }
 })
+
+// ── Custom Inputs (Jan–Feb, a few per week) ───────────────────────────
+
+const CUSTOM_INPUT_TITLES = [
+  'Bug investigation',
+  'Documentation writing',
+  'Infrastructure maintenance',
+  'Mentoring session',
+  'Tech debt cleanup',
+]
+
+const ciWorkingDays = [...workingDays(2026, 0), ...workingDays(2026, 1)]
+let ciIdCounter = 70001
+
+export const mockDdsCustomInputs: DdsCustomInput[] = []
+
+for (let i = 0; i < ciWorkingDays.length; i++) {
+  // Add a custom input every 2-3 working days
+  if (rand() < 0.4) continue
+  const day = ciWorkingDays[i]
+  const title = CUSTOM_INPUT_TITLES[Math.floor(rand() * CUSTOM_INPUT_TITLES.length)]
+  const hours = 1 + Math.floor(rand() * 3)
+  const hour = 10 + Math.floor(rand() * 6)
+  const id = `ci_${ciIdCounter++}`
+
+  mockDdsCustomInputs.push({
+    id,
+    input: title,
+    duration: hours,
+    time_unit: 'hours',
+    start_time: `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`,
+  })
+
+  // Also add corresponding task entry
+  const ciIssueMapping = KEYWORD_ISSUE_MAP.find((m) =>
+    m.keywords.some((kw) => title.toLowerCase().includes(kw)),
+  )
+  mockDdsTasks.push({
+    task_id: id,
+    description: title,
+    duration: `${hours}h`,
+    start_time: `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`,
+    issue_key: ciIssueMapping?.issue.key ?? null,
+    issue_name: ciIssueMapping?.issue.summary ?? null,
+    project_key: ciIssueMapping?.issue.project_key ?? null,
+    revision: 1,
+    source: 'custom_input',
+    source_id: id,
+  })
+}

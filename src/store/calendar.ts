@@ -33,6 +33,7 @@ interface CalendarState {
   authMethod: CalendarAuthMethod | null
   personalClientId: string | null
   connectionHealth: ConnectionHealth
+  _authChecked: boolean
   selectedPeriod: Period
   events: CalendarEvent[]
   eventsLoading: boolean
@@ -55,6 +56,7 @@ export const useCalendarStore = create<CalendarState>()(
       authMethod: null,
       personalClientId: null,
       connectionHealth: 'unknown',
+      _authChecked: false,
       selectedPeriod: currentPeriod(),
       events: [],
       eventsLoading: false,
@@ -182,6 +184,8 @@ export const useCalendarStore = create<CalendarState>()(
           }
         } catch {
           // offline or not deployed yet
+        } finally {
+          set({ _authChecked: true })
         }
       },
 
@@ -194,6 +198,8 @@ export const useCalendarStore = create<CalendarState>()(
           const data = await res.json()
           if (data.healthy) {
             set({ connectionHealth: 'healthy' })
+            const cur = get().status
+            if (cur === 'expired' || cur === 'error') set({ status: 'connected' })
             return
           }
 

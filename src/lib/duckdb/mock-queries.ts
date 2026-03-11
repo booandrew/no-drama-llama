@@ -8,7 +8,9 @@ import type {
   DdsJiraWorklog,
   DdsCalendarEvent,
   DdsTempoDailyCapacity,
+  DdsCustomInput,
   DdsTask,
+  TaskUpdate,
 } from './queries'
 import {
   mockSrcJiraIssues,
@@ -20,6 +22,7 @@ import {
   mockDdsJiraWorklogs,
   mockDdsCalendarEvents,
   mockDdsTempoDailyCapacity,
+  mockDdsCustomInputs,
   mockDdsTasks,
 } from '@/lib/mock-data'
 
@@ -105,6 +108,19 @@ export function readDdsTempoDailyCapacity(
   return Promise.resolve(filtered.sort((a, b) => a.date.localeCompare(b.date)))
 }
 
+export function readDdsCustomInputs(
+  dateStart: string,
+  dateEnd: string,
+): Promise<DdsCustomInput[]> {
+  const filtered = mockDdsCustomInputs.filter((ci) => {
+    if (!ci.start_time) return false
+    return ci.start_time >= dateStart && ci.start_time < dateEnd
+  })
+  return Promise.resolve(
+    filtered.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')),
+  )
+}
+
 export function readDdsTasks(dateStart: string, dateEnd: string): Promise<DdsTask[]> {
   const filtered = mockDdsTasks.filter((t) => {
     if (!t.start_time) return false
@@ -113,4 +129,15 @@ export function readDdsTasks(dateStart: string, dateEnd: string): Promise<DdsTas
   return Promise.resolve(
     filtered.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')),
   )
+}
+
+export async function updateTask(taskId: string, fields: TaskUpdate): Promise<void> {
+  for (const t of mockDdsTasks) {
+    if (t.task_id === taskId) {
+      if ('issue_key' in fields) t.issue_key = fields.issue_key ?? null
+      if ('issue_name' in fields) t.issue_name = fields.issue_name ?? null
+      if ('project_key' in fields) t.project_key = fields.project_key ?? null
+      if ('duration' in fields) t.duration = fields.duration!
+    }
+  }
 }

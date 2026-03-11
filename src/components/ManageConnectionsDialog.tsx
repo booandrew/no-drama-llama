@@ -519,6 +519,14 @@ function TempoTab() {
     }
   }
 
+  const jiraSiteUrl = useJiraStore((s) => s.siteUrl)
+  const jiraSiteBase = jiraSiteUrl
+    ? `https://${jiraSiteUrl.replace(/^https?:\/\//, '')}`
+    : null
+  const jiraTempoSettingsUrl = jiraSiteBase
+    ? `${jiraSiteBase}${tempoSettingsPath}`
+    : null
+
   const configured = status !== 'idle'
   if (configured) {
     const broken = status === 'expired' || status === 'error' || health === 'unhealthy'
@@ -530,37 +538,29 @@ function TempoTab() {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Auth method</span>
-          <span className="text-sm">API Token (PAT)</span>
+          <span className="text-sm">API Token</span>
         </div>
-        <div className="flex flex-col gap-2">
-          <Label className="text-muted-foreground">Jira site (for settings link)</Label>
-          <Input
-            value={siteInput}
-            onChange={(e) => setSiteInput(e.target.value)}
-            className="h-8 text-xs"
-          />
-          {tempoSettingsUrl ? (
-            <a
-              href={tempoSettingsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary underline break-all"
-            >
-              Manage Tempo API tokens
-              <ExternalLink className="size-3 shrink-0" />
-            </a>
-          ) : (
-            <a
-              href="https://help.tempo.io/timesheets/latest/using-rest-api-integrations"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary underline"
-            >
-              Tempo API docs
-              <ExternalLink className="size-3" />
-            </a>
-          )}
-        </div>
+        {jiraTempoSettingsUrl ? (
+          <a
+            href={jiraTempoSettingsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-primary underline break-all"
+          >
+            Manage Tempo API tokens
+            <ExternalLink className="size-3 shrink-0" />
+          </a>
+        ) : (
+          <a
+            href="https://help.tempo.io/timesheets/latest/using-rest-api-integrations"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-primary underline"
+          >
+            Tempo API docs
+            <ExternalLink className="size-3" />
+          </a>
+        )}
         {broken && (
           <p className="text-sm text-destructive">
             API token expired or revoked. Generate a new one in Tempo Settings.

@@ -49,15 +49,34 @@ async function getLatestDbDate(): Promise<string | null> {
   }
 }
 
-export async function getLatestDataMonth(isMockMode: boolean): Promise<Period> {
-  const fallback = currentPeriod()
+export interface LatestDataResult {
+  period: Period
+  /** ISO date string (YYYY-MM-DD) of the latest record */
+  date: string
+}
 
+/**
+ * Returns the latest date with existing DDS data, or null if no data exists.
+ * Callers should fall back to "current date" when null.
+ */
+export async function getLatestDataDate(
+  isMockMode: boolean,
+): Promise<LatestDataResult | null> {
   const dateStr = isMockMode ? getLatestMockDate() : await getLatestDbDate()
-  if (!dateStr) return fallback
+  if (!dateStr) return null
 
   try {
-    return periodFromISO(dateStr)
+    const period = periodFromISO(dateStr)
+    // Normalize to YYYY-MM-DD (input may be a full ISO timestamp)
+    const date = dateStr.slice(0, 10)
+    return { period, date }
   } catch {
-    return fallback
+    return null
   }
+}
+
+/** @deprecated Use getLatestDataDate instead */
+export async function getLatestDataMonth(isMockMode: boolean): Promise<Period> {
+  const result = await getLatestDataDate(isMockMode)
+  return result?.period ?? currentPeriod()
 }

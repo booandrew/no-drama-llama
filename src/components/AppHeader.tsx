@@ -49,6 +49,10 @@ export function AppHeader() {
             <img src={llamaSvg} alt="" className="size-4" />
             Llama Time
           </TabsTrigger>
+          <TabsTrigger value="custom-inputs" className="gap-1.5">
+            <PenLine className="size-4" />
+            Custom Inputs
+          </TabsTrigger>
           <TabsTrigger value="wool-insights">Wool Insights</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -74,10 +78,6 @@ export function AppHeader() {
             <DropdownMenuItem onClick={() => setActiveTab('sources')}>
               <Database className="size-4" />
               Sources
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setActiveTab('custom-inputs')}>
-              <PenLine className="size-4" />
-              Custom Inputs
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setActiveTab('mappings')}>
               <GitMerge className="size-4" />
