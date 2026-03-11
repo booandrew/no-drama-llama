@@ -38,8 +38,14 @@ interface CustomInputsState {
   getPeriod: () => { start: string; end: string }
 
   loadItems: () => Promise<void>
-  addItem: (item: Omit<DdsCustomInput, 'id'>) => Promise<void>
-  updateItem: (item: DdsCustomInput) => Promise<void>
+  addItem: (
+    item: Omit<DdsCustomInput, 'id'>,
+    issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+  ) => Promise<void>
+  updateItem: (
+    item: DdsCustomInput,
+    issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+  ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
 }
 
@@ -81,20 +87,20 @@ export const useCustomInputsStore = create<CustomInputsState>()(
         }
       },
 
-      addItem: async (item) => {
+      addItem: async (item, issueOverride) => {
         const id = crypto.randomUUID()
         const fullItem: DdsCustomInput = { ...item, id }
         await upsertDdsCustomInputs([fullItem])
         const revision = await nextTaskRevision()
-        await customInputToTask(fullItem, revision)
+        await customInputToTask(fullItem, revision, issueOverride)
         await get().loadItems()
         logAction('input', 'success', 'Added custom time entry')
       },
 
-      updateItem: async (item) => {
+      updateItem: async (item, issueOverride) => {
         await upsertDdsCustomInputs([item])
         const revision = await nextTaskRevision()
-        await customInputToTask(item, revision)
+        await customInputToTask(item, revision, issueOverride)
         await get().loadItems()
         logAction('input', 'success', 'Updated custom time entry')
       },

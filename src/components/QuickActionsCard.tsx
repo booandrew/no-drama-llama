@@ -8,6 +8,7 @@ import {
   Minimize2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { useActivityLogStore, type ActionStatus } from '@/store/activity-log'
 
 function statusIcon(status: ActionStatus) {
@@ -32,11 +33,18 @@ function timeAgo(date: Date) {
   return `${hours}h`
 }
 
-export function QuickActionsCard() {
+export function ActivityLogCard() {
   const entries = useActivityLogStore((s) => s.entries)
+  const loadEntries = useActivityLogStore((s) => s.loadEntries)
+  const { isReady } = useDuckDB()
   const [expanded, setExpanded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [, setTick] = useState(0)
+
+  // Load persisted entries from DuckDB once ready
+  useEffect(() => {
+    if (isReady) loadEntries()
+  }, [isReady, loadEntries])
 
   // Update relative times every 30s
   useEffect(() => {
@@ -58,7 +66,7 @@ export function QuickActionsCard() {
       <Card className="flex-1 gap-0 py-0">
         <CardHeader className="shrink-0 px-4 py-3">
           <div className="flex items-center justify-between">
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>Activity Log</CardTitle>
             <button
               onClick={() => setExpanded(true)}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -95,7 +103,7 @@ export function QuickActionsCard() {
     <Card className="absolute inset-0 z-10 flex flex-col gap-0 py-0">
       <CardHeader className="shrink-0 px-4 py-3">
         <div className="flex items-center justify-between">
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>Activity Log</CardTitle>
           <button
             onClick={() => setExpanded(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"

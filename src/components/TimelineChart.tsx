@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Bar, BarChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 
@@ -25,6 +25,7 @@ interface TimelineChartProps {
   tasks: DdsTask[]
   issues?: DdsJiraIssue[]
   onTaskUpdate?: (taskId: string, fields: TaskUpdate) => void
+  onAddTask?: (task: Omit<DdsTask, 'task_id' | 'revision'>) => void
   year: number
   month: number
   domain?: [number, number]
@@ -41,6 +42,8 @@ interface SegmentMeta {
   issueKey: string | null
   issueName: string | null
   projectKey: string | null
+  source: string
+  sourceId: string | null
   duration: string
   startTime: Date
   endTime: Date
@@ -105,13 +108,14 @@ function buildChartData(
   for (const t of tasks) {
     const desc = t.description ?? '(no title)'
     const typeOrd = sourceTypeOrder(t.source)
+    const ik = t.issue_key ?? ''
     let key: string
     if (typeOrd === 0) {
       key = `wl::${t.issue_key ?? desc}`
     } else if (typeOrd === 1) {
-      key = `ci::${desc}`
+      key = `ci::${desc}::${ik}`
     } else {
-      key = `cal::${desc}::${t.issue_key ?? ''}`
+      key = `cal::${desc}::${ik}`
     }
     const list = grouped.get(key) ?? []
     list.push(t)
@@ -119,13 +123,14 @@ function buildChartData(
   }
 
   // Sort: type group order, then mapped first, then alpha
+  // Use aggregated issue_key (any task with issue_key) to match LlamaTimeTab sidebar sorting
   const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
     const aType = sourceTypeOrder(grouped.get(a)![0].source)
     const bType = sourceTypeOrder(grouped.get(b)![0].source)
     if (aType !== bType) return aType - bType
-    const aIssue = grouped.get(a)![0].issue_key
-    const bIssue = grouped.get(b)![0].issue_key
-    if (!!aIssue !== !!bIssue) return aIssue ? -1 : 1
+    const aHasIssue = grouped.get(a)!.some((t) => t.issue_key != null)
+    const bHasIssue = grouped.get(b)!.some((t) => t.issue_key != null)
+    if (aHasIssue !== bHasIssue) return aHasIssue ? -1 : 1
     const aName = grouped.get(a)![0].description ?? '(no title)'
     const bName = grouped.get(b)![0].description ?? '(no title)'
     return aName.localeCompare(bName)
@@ -173,6 +178,8 @@ function buildChartData(
         issueKey: task.issue_key,
         issueName: task.issue_name,
         projectKey: task.project_key,
+        source: task.source,
+        sourceId: task.source_id,
         duration: task.duration,
         startTime: new Date(task.start_time),
         endTime: new Date(taskStartMs + durationMin * 60000),
@@ -204,7 +211,7 @@ function formatDateShort(date: Date): string {
   })
 }
 
-const QUICK_LOG_OPTIONS = [
+const QUICK_TASK_OPTIONS = [
   { label: '+30min', minutes: 30 },
   { label: '+1h', minutes: 60 },
   { label: '+2h', minutes: 120 },
@@ -214,18 +221,31 @@ function EventDetailDialog({
   meta,
   issues,
   onTaskUpdate,
+  onAddTask,
   onClose,
 }: {
   meta: SegmentMeta
   issues: DdsJiraIssue[]
   onTaskUpdate?: (taskId: string, fields: TaskUpdate) => void
+  onAddTask?: (task: Omit<DdsTask, 'task_id' | 'revision'>) => void
   onClose: () => void
 }) {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(meta.issueKey)
-  const currentMin = parseDuration(meta.duration)
   const [durationInput, setDurationInput] = useState(meta.duration)
 
-  const issueItems = issues.map((i) => ({ key: i.issue_key, summary: i.issue_name }))
+  const issueFilter = useCallback(
+    (value: string, query: string) => {
+      if (!query) return true
+      const iss = issues.find((i) => i.issue_key === value)
+      const str = iss
+        ? `${iss.issue_key} ${iss.issue_name ?? ''}`
+        : String(value ?? '')
+      return str.toLowerCase().includes(query.toLowerCase())
+    },
+    [issues],
+  )
+
+  const issueKeys = useMemo(() => issues.map((i) => i.issue_key), [issues])
 
   const handleIssueChange = (val: string | null) => {
     setSelectedIssue(val)
@@ -246,12 +266,20 @@ function EventDetailDialog({
     }
   }
 
-  const handleQuickLog = (addMinutes: number) => {
-    if (!onTaskUpdate) return
-    const newMin = currentMin + addMinutes
-    const newDur = minutesToDurationStr(newMin)
-    setDurationInput(newDur)
-    onTaskUpdate(meta.taskId, { duration: newDur })
+  const handleQuickTask = (addMinutes: number) => {
+    if (!onAddTask) return
+    const currentIssueKey = selectedIssue
+    const issue = currentIssueKey ? issues.find((i) => i.issue_key === currentIssueKey) : null
+    onAddTask({
+      description: meta.name,
+      duration: minutesToDurationStr(addMinutes),
+      start_time: meta.startTime.toISOString(),
+      issue_key: currentIssueKey,
+      issue_name: issue?.issue_name ?? meta.issueName,
+      project_key: issue?.project_key ?? meta.projectKey,
+      source: 'custom_input',
+      source_id: null,
+    })
   }
 
   return (
@@ -298,17 +326,29 @@ function EventDetailDialog({
               value={selectedIssue}
               onValueChange={(val) => handleIssueChange(val as string | null)}
               disabled={meta.readOnly}
+              filter={issueFilter}
+              items={issueKeys}
             >
-              <ComboboxInput placeholder="Search issues..." className="h-9 w-full" disabled={meta.readOnly} />
+              <ComboboxInput
+                placeholder="Search issues..."
+                className="h-9 w-full"
+                disabled={meta.readOnly}
+                showClear={!!selectedIssue}
+              />
               <ComboboxContent>
-                <ComboboxList>
-                  <ComboboxEmpty>No issues found</ComboboxEmpty>
-                  {issueItems.map((issue) => (
-                    <ComboboxItem key={issue.key} value={issue.key}>
-                      <span className="font-medium">{issue.key}</span>
-                      <span className="text-muted-foreground truncate">{issue.summary}</span>
-                    </ComboboxItem>
-                  ))}
+                <ComboboxEmpty>No issues found</ComboboxEmpty>
+                <ComboboxList className="max-h-60">
+                  {(issueKey: string) => {
+                    const issue = issues.find((i) => i.issue_key === issueKey)
+                    return (
+                      <ComboboxItem key={issueKey} value={issueKey}>
+                        <span className="font-medium">{issueKey}</span>
+                        <span className="text-muted-foreground truncate">
+                          {issue?.issue_name}
+                        </span>
+                      </ComboboxItem>
+                    )
+                  }}
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
@@ -318,17 +358,17 @@ function EventDetailDialog({
             <>
               <Separator />
 
-              {/* Quick Log Add */}
+              {/* Quick Task */}
               <div className="flex flex-col gap-2">
                 <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Quick Log Add
+                  Quick Task
                 </span>
                 <div className="flex gap-2">
-                  {QUICK_LOG_OPTIONS.map((opt) => (
+                  {QUICK_TASK_OPTIONS.map((opt) => (
                     <button
                       key={opt.label}
                       className="rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-                      onClick={() => handleQuickLog(opt.minutes)}
+                      onClick={() => handleQuickTask(opt.minutes)}
                     >
                       {opt.label}
                     </button>
@@ -347,6 +387,7 @@ export function TimelineChart({
   tasks,
   issues,
   onTaskUpdate,
+  onAddTask,
   year,
   month,
   domain,
@@ -574,6 +615,7 @@ export function TimelineChart({
           meta={selectedMeta}
           issues={issues ?? []}
           onTaskUpdate={onTaskUpdate}
+          onAddTask={onAddTask}
           onClose={() => setSelectedMeta(null)}
         />
       )}

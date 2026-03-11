@@ -35,9 +35,16 @@ export function CustomInputForm({ open, onOpenChange, item, onSave }: Props) {
   useEffect(() => {
     if (item) {
       setInput(item.input)
-      setDuration(item.duration != null ? String(item.duration) : '')
-      setTimeUnit(item.time_unit ?? 'hours')
-      setStartTime(item.start_time.slice(0, 16))
+      setDuration(String(item.duration))
+      setTimeUnit(item.time_unit)
+      const raw = item.start_time as unknown
+      const st =
+        typeof raw === 'string'
+          ? raw
+          : raw instanceof Date
+            ? raw.toISOString()
+            : new Date(raw as number).toISOString()
+      setStartTime(st.slice(0, 16))
     } else {
       setInput('')
       setDuration('')
@@ -46,15 +53,16 @@ export function CustomInputForm({ open, onOpenChange, item, onSave }: Props) {
     }
   }, [item, open])
 
-  const canSave = input.trim() && startTime
+  const parsedDuration = parseFloat(duration)
+  const canSave = input.trim() && startTime && !isNaN(parsedDuration) && parsedDuration > 0
 
   const handleSave = () => {
     if (!canSave) return
     onSave({
       ...(item ? { id: item.id } : {}),
       input: input.trim(),
-      duration: duration ? parseFloat(duration) : null,
-      time_unit: duration ? timeUnit : null,
+      duration: parsedDuration,
+      time_unit: timeUnit,
       start_time: new Date(startTime).toISOString(),
     })
     onOpenChange(false)
@@ -80,12 +88,13 @@ export function CustomInputForm({ open, onOpenChange, item, onSave }: Props) {
 
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="ci-duration">Duration</Label>
+              <Label htmlFor="ci-duration">Duration *</Label>
               <Input
                 id="ci-duration"
                 type="number"
-                min="0"
+                min="0.25"
                 step="0.25"
+                required
                 placeholder="e.g. 1.5"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}

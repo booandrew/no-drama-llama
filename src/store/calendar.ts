@@ -70,8 +70,10 @@ export const useCalendarStore = create<CalendarState>()(
           })
           if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
           set({ authMethod: method, status: 'connected', connectionHealth: 'healthy' })
+          logAction('connection', 'success', 'Connected to Google Calendar')
         } catch (e) {
           console.error('[Calendar] Connect failed:', e)
+          logAction('connection', 'error', 'Failed to connect to Google Calendar')
           set({ status: 'error', connectionHealth: 'unhealthy' })
         }
       },
@@ -83,6 +85,7 @@ export const useCalendarStore = create<CalendarState>()(
       setExpired: () => set({ status: 'expired' }),
 
       disconnect: async () => {
+        logAction('connection', 'info', 'Disconnected from Google Calendar')
         try {
           await fetch('/gcal-api/.auth/disconnect', { method: 'DELETE' })
         } catch {

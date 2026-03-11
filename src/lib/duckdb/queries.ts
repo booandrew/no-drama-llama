@@ -107,8 +107,8 @@ export interface DdsTempoDailyCapacity {
 export interface DdsCustomInput {
   id: string
   input: string
-  duration: number | null
-  time_unit: string | null
+  duration: number
+  time_unit: string
   start_time: string
 }
 
@@ -409,11 +409,14 @@ export function readDdsCalendarEvents(dateStart: string, dateEnd: string) {
   })
 }
 
-export function readDdsTasks(dateStart: string, dateEnd: string) {
-  return readRows<DdsTask>('dds_tasks', {
-    where: `start_time >= ${escSql(dateStart)} AND start_time < ${escSql(dateEnd)}`,
-    orderBy: 'start_time',
-  })
+export async function readDdsTasks(dateStart: string, dateEnd: string) {
+  const result = await exec(`
+    SELECT * FROM dds_tasks
+    WHERE start_time >= ${escSql(dateStart)} AND start_time < ${escSql(dateEnd)}
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY revision DESC) = 1
+    ORDER BY start_time
+  `)
+  return result.toArray().map((row) => row.toJSON() as DdsTask)
 }
 
 // ── Custom Inputs CRUD ──────────────────────────────────────────────
@@ -599,24 +602,130 @@ export async function updateTask(taskId: string, fields: TaskUpdate): Promise<vo
   if (rows.length > 0) await syncTimesheetForTasks(rows)
 }
 
-export async function customInputToTask(input: DdsCustomInput, revision: number): Promise<void> {
+export async function customInputToTask(
+  input: DdsCustomInput,
+  revision: number,
+  issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+): Promise<void> {
+  // Determine issue: explicit override > preserved from DB > null (let keyword mappings run)
+  let issue_key: string | null = null
+  let issue_name: string | null = null
+  let project_key: string | null = null
+
+  if (issueOverride !== undefined) {
+    issue_key = issueOverride.issue_key
+    issue_name = issueOverride.issue_name
+    project_key = issueOverride.project_key
+  } else {
+    // Preserve existing issue_key from DB so edits don't reset manual assignments
+    const existing = await exec(
+      `SELECT issue_key, issue_name, project_key FROM dds_tasks WHERE task_id = ${escSql(input.id)} ORDER BY revision DESC LIMIT 1`,
+    )
+    const rows = existing.toArray()
+    if (rows.length > 0) {
+      const r = rows[0].toJSON() as Pick<DdsTask, 'issue_key' | 'issue_name' | 'project_key'>
+      issue_key = r.issue_key
+      issue_name = r.issue_name
+      project_key = r.project_key
+    }
+  }
+
   const task: DdsTask = {
     task_id: input.id,
     description: input.input,
-    duration:
-      input.duration != null
-        ? `${input.duration}${input.time_unit === 'minutes' ? 'm' : 'h'}`
-        : '0h',
+    duration: `${input.duration}${input.time_unit === 'minutes' ? 'm' : 'h'}`,
     start_time: input.start_time,
-    issue_key: null,
-    issue_name: null,
-    project_key: null,
+    issue_key,
+    issue_name,
+    project_key,
     revision,
     source: 'custom_input',
     source_id: input.id,
   }
   await upsertTasksWithMappings([task])
 }
+
+function parseDurationToMin(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+  }
+  const n = Number(dur)
+  return n > 0 ? Math.round(n / 60) : 0
+}
+
+export async function createTask(task: Omit<DdsTask, 'revision'>): Promise<void> {
+  const revision = await nextTaskRevision()
+  const fullTask: DdsTask = { ...task, revision }
+
+  // If source is custom_input, also create the DdsCustomInput entry
+  if (task.source === 'custom_input') {
+    const durationMin = parseDurationToMin(task.duration)
+    const useHours = durationMin >= 60 && durationMin % 60 === 0
+    await upsertDdsCustomInputs([{
+      id: task.task_id,
+      input: task.description ?? '',
+      duration: useHours ? durationMin / 60 : durationMin,
+      time_unit: useHours ? 'hours' : 'minutes',
+      start_time: task.start_time,
+    }])
+  }
+
+  await upsertTasksWithMappings([fullTask])
+}
+
+// ── Audit Log ────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string
+  timestamp: string
+  type: string
+  status: string
+  message: string
+  details: string | null
+}
+
+export async function insertAuditLogEntry(entry: {
+  id: string
+  type: string
+  status: string
+  message: string
+  details?: string
+}): Promise<void> {
+  await exec(
+    `INSERT INTO audit_log (id, timestamp, type, status, message, details)
+     VALUES (${escSql(entry.id)}, ${escSql(new Date().toISOString())}, ${escSql(entry.type)}, ${escSql(entry.status)}, ${escSql(entry.message)}, ${escSql(entry.details ?? null)})`,
+  )
+}
+
+export async function updateAuditLogEntry(
+  id: string,
+  updates: { status?: string; message?: string; details?: string },
+): Promise<void> {
+  const sets: string[] = []
+  if (updates.status !== undefined) sets.push(`status = ${escSql(updates.status)}`)
+  if (updates.message !== undefined) sets.push(`message = ${escSql(updates.message)}`)
+  if (updates.details !== undefined) sets.push(`details = ${escSql(updates.details)}`)
+  if (sets.length === 0) return
+  await exec(`UPDATE audit_log SET ${sets.join(', ')} WHERE id = ${escSql(id)}`)
+}
+
+export async function readAuditLogEntries(limit = 200): Promise<AuditLogEntry[]> {
+  const result = await exec(
+    `SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`,
+  )
+  return result
+    .toArray()
+    .map((r) => r.toJSON() as AuditLogEntry)
+    .reverse()
+}
+
+export async function clearAuditLog(): Promise<void> {
+  await exec('DELETE FROM audit_log')
+}
+
+// ── Clear All Data ───────────────────────────────────────────────────
 
 export async function clearAllData() {
   const conn = getConnection()

@@ -10,7 +10,7 @@ import { CustomInputsTab } from '@/components/CustomInputsTab'
 import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
-import { QuickActionsCard } from '@/components/QuickActionsCard'
+import { ActivityLogCard } from '@/components/QuickActionsCard'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
@@ -224,7 +224,7 @@ function App() {
               {/* Right sidebar */}
               <div className="relative flex flex-col gap-4">
                 <SummaryCard />
-                <QuickActionsCard />
+                <ActivityLogCard />
               </div>
             </div>
           </div>

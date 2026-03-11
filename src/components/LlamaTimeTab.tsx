@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import {
   Combobox,
   ComboboxContent,
+  ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
@@ -424,6 +425,7 @@ export function LlamaTimeTab() {
   const loadTasks = useTasksStore((s) => s.loadTasks)
   const updateTask = useTasksStore((s) => s.updateTask)
   const updateTasks = useTasksStore((s) => s.updateTasks)
+  const addTask = useTasksStore((s) => s.addTask)
 
   const aggregateStatus = useAggregateConnectionStatus()
   const allAuthChecked = useAllAuthChecked()
@@ -459,13 +461,14 @@ export function LlamaTimeTab() {
     for (const t of allTasks) {
       const desc = t.description ?? '(no title)'
       const type = getRowType(t.source)
+      const ik = t.issue_key ?? ''
       let key: string
       if (type === 'worklog') {
         key = `wl::${t.issue_key ?? desc}`
       } else if (type === 'custom') {
-        key = `ci::${desc}`
+        key = `ci::${desc}::${ik}`
       } else {
-        key = `cal::${desc}`
+        key = `cal::${desc}::${ik}`
       }
 
       if (!grouped.has(key)) {
@@ -497,6 +500,8 @@ export function LlamaTimeTab() {
     return { allTasks, taskGroups: groups, barColors: colors }
   }, [tasks, worklogs, issues])
 
+  const issueKeys = useMemo(() => issues.map((i) => i.issue_key), [issues])
+
   const use24h = useMemo(() => hasTasksOutsideWorkHours(allTasks), [allTasks])
   const effectiveMinutesPerDay = use24h ? MINUTES_PER_DAY : WORK_MINUTES_PER_DAY
   const workStartMinute = use24h ? 0 : WORK_START_HOUR * 60
@@ -505,6 +510,42 @@ export function LlamaTimeTab() {
   const dayLabelsRef = useRef<HTMLDivElement>(null)
   const taskNamesRef = useRef<HTMLDivElement>(null)
   const [scrollFraction, setScrollFraction] = useState(0)
+
+  // Column resizing
+  const [sidebarWidth, setSidebarWidth] = useState(356)
+  const [issueColWidth, setIssueColWidth] = useState(140)
+  const typeColWidth = 32
+
+  const handleResizeSidebar = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = sidebarWidth
+    const minSidebar = typeColWidth + issueColWidth + 100
+    const onMove = (me: MouseEvent) => {
+      setSidebarWidth(Math.max(minSidebar, Math.min(600, startW + me.clientX - startX)))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [sidebarWidth, issueColWidth])
+
+  const handleResizeIssueCol = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = issueColWidth
+    const onMove = (me: MouseEvent) => {
+      setIssueColWidth(Math.max(80, Math.min(300, startW - (me.clientX - startX))))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [issueColWidth])
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
   const totalMinutes = daysInMonth * effectiveMinutesPerDay
@@ -523,6 +564,18 @@ export function LlamaTimeTab() {
       })
     },
     [issues, updateTasks],
+  )
+
+  const issueFilter = useCallback(
+    (value: string, query: string) => {
+      if (!query) return true
+      const issue = issues.find((i) => i.issue_key === value)
+      const str = issue
+        ? `${issue.issue_key} ${issue.issue_name ?? ''}`
+        : String(value ?? '')
+      return str.toLowerCase().includes(query.toLowerCase())
+    },
+    [issues],
   )
 
   const forwardWheel = useCallback((e: React.WheelEvent) => {
@@ -646,16 +699,25 @@ export function LlamaTimeTab() {
 
           {/* Day labels header — fixed, syncs horizontal scroll */}
           <div className="flex shrink-0 border-b">
-            <div className="flex w-[356px] shrink-0 items-center gap-1.5 border-r pl-2 pr-2">
-              <span className="w-[32px] shrink-0 text-xs font-medium text-muted-foreground text-center">
+            <div className="relative flex shrink-0 items-center gap-1.5 border-r pl-2 pr-2" style={{ width: sidebarWidth }}>
+              <span className="shrink-0 px-1 text-xs font-medium text-muted-foreground text-center" style={{ width: typeColWidth }}>
                 Type
               </span>
-              <span className="min-w-0 flex-1 text-xs font-medium text-muted-foreground">
+              <span className="min-w-0 flex-1 border-l pl-1.5 text-xs font-medium text-muted-foreground truncate">
                 Name
               </span>
-              <span className="w-[140px] shrink-0 text-xs font-medium text-muted-foreground text-center">
-                Issue code
+              <div
+                className="absolute top-0 h-full w-3 cursor-col-resize z-20 hover:bg-border/60"
+                style={{ right: issueColWidth + 8 - 1 }}
+                onMouseDown={handleResizeIssueCol}
+              />
+              <span className="shrink-0 border-l pl-1.5 text-xs font-medium text-muted-foreground text-center" style={{ width: issueColWidth }}>
+                Issue Key
               </span>
+              <div
+                className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-border/60 z-20"
+                onMouseDown={handleResizeSidebar}
+              />
             </div>
             <div ref={dayLabelsRef} className="flex-1 overflow-hidden" onWheel={forwardWheel}>
               <div
@@ -683,7 +745,8 @@ export function LlamaTimeTab() {
             {/* Task names column — synced vertical scroll */}
             <div
               ref={taskNamesRef}
-              className="shrink-0 w-[356px] overflow-hidden border-r bg-card z-10"
+              className="shrink-0 overflow-hidden border-r bg-card z-10"
+              style={{ width: sidebarWidth }}
               onWheel={forwardWheel}
             >
               <div className="flex flex-col" style={{ height: chartBodyHeight }}>
@@ -698,16 +761,18 @@ export function LlamaTimeTab() {
                         title={group.desc}
                       >
                         <span
-                          className={`w-[32px] shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
+                          className={`shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
+                          style={{ width: typeColWidth }}
                         >
                           {cfg.label}
                         </span>
                         <span className="min-w-0 flex-1 text-sm text-muted-foreground truncate">
-                          {group.desc.length > 18 ? group.desc.slice(0, 16) + '...' : group.desc}
+                          {group.desc}
                         </span>
                         {group.readonly ? (
                           <Input
-                            className="h-7 w-[140px] shrink-0 text-xs"
+                            className="h-7 shrink-0 text-xs"
+                            style={{ width: issueColWidth }}
                             value={group.issueKey ?? ''}
                             disabled
                           />
@@ -717,26 +782,33 @@ export function LlamaTimeTab() {
                             onValueChange={(val) =>
                               handleGroupIssueChange(group.taskIds, val as string | null)
                             }
+                            filter={issueFilter}
+                            items={issueKeys}
                           >
                             <ComboboxInput
                               placeholder="—"
-                              className="h-7 w-[140px] shrink-0 text-xs"
+                              className="h-7 shrink-0 text-xs"
+                              style={{ width: issueColWidth }}
                               showClear={!!group.issueKey}
                             />
                             <ComboboxContent className="min-w-64">
-                              <ComboboxList>
-                                {issues.map((issue) => (
-                                  <ComboboxItem
-                                    key={issue.issue_key}
-                                    value={issue.issue_key}
-                                    className="whitespace-nowrap"
-                                  >
-                                    <span className="font-medium shrink-0">{issue.issue_key}</span>
-                                    <span className="text-muted-foreground truncate">
-                                      {issue.issue_name}
-                                    </span>
-                                  </ComboboxItem>
-                                ))}
+                              <ComboboxEmpty>No issues found</ComboboxEmpty>
+                              <ComboboxList className="max-h-60">
+                                {(issueKey: string) => {
+                                  const issue = issues.find((i) => i.issue_key === issueKey)
+                                  return (
+                                    <ComboboxItem
+                                      key={issueKey}
+                                      value={issueKey}
+                                      className="whitespace-nowrap"
+                                    >
+                                      <span className="font-medium shrink-0">{issueKey}</span>
+                                      <span className="text-muted-foreground truncate">
+                                        {issue?.issue_name}
+                                      </span>
+                                    </ComboboxItem>
+                                  )
+                                }}
                               </ComboboxList>
                             </ComboboxContent>
                           </Combobox>
@@ -760,6 +832,7 @@ export function LlamaTimeTab() {
                   tasks={allTasks}
                   issues={issues}
                   onTaskUpdate={updateTask}
+                  onAddTask={addTask}
                   year={selectedPeriod.year}
                   month={selectedPeriod.month}
                   hideYAxis

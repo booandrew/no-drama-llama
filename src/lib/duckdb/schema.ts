@@ -212,6 +212,19 @@ export async function runSchema(conn: AsyncDuckDBConnection): Promise<void> {
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_map_keyword ON map_keyword_issue(project_key, issue_key)`,
   )
 
+  // ── Audit Log ────────────────────────────────────────────────────────
+  await exec(
+    conn,
+    `CREATE TABLE IF NOT EXISTS audit_log (
+      id VARCHAR PRIMARY KEY,
+      timestamp TIMESTAMP NOT NULL DEFAULT current_timestamp,
+      type VARCHAR NOT NULL,
+      status VARCHAR NOT NULL,
+      message VARCHAR NOT NULL,
+      details VARCHAR
+    )`,
+  )
+
   if (import.meta.env.DEV) {
     console.debug(`[DuckDB] Schema ready (v${SCHEMA_VERSION})`)
   }

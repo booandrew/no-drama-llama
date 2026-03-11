@@ -68,6 +68,13 @@ export function ManageConnectionsDialog({ open, onOpenChange, defaultTab }: Prop
     return 'gcal'
   }
 
+  const [activeTab, setActiveTab] = useState(computeDefault)
+
+  // Sync tab when dialog opens with a specific tab
+  useEffect(() => {
+    if (open) setActiveTab(computeDefault())
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -75,7 +82,7 @@ export function ManageConnectionsDialog({ open, onOpenChange, defaultTab }: Prop
           <DialogTitle>Manage Connections</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue={computeDefault()} className="mt-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
           <TabsList className="w-full">
             <TabsTrigger value="gcal" className="flex-1 gap-1.5">
               <StatusDot

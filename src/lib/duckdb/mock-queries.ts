@@ -11,6 +11,7 @@ import type {
   DdsCustomInput,
   DdsTask,
   TaskUpdate,
+  AuditLogEntry,
 } from './queries'
 import {
   mockSrcJiraIssues,
@@ -126,8 +127,17 @@ export function readDdsTasks(dateStart: string, dateEnd: string): Promise<DdsTas
     if (!t.start_time) return false
     return t.start_time >= dateStart && t.start_time < dateEnd
   })
+  // Keep only the latest revision per task_id
+  const latestByTaskId = new Map<string, DdsTask>()
+  for (const t of filtered) {
+    const existing = latestByTaskId.get(t.task_id)
+    if (!existing || t.revision > existing.revision) {
+      latestByTaskId.set(t.task_id, t)
+    }
+  }
+  const deduped = Array.from(latestByTaskId.values())
   return Promise.resolve(
-    filtered.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')),
+    deduped.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')),
   )
 }
 
@@ -140,4 +150,70 @@ export async function updateTask(taskId: string, fields: TaskUpdate): Promise<vo
       if ('duration' in fields) t.duration = fields.duration!
     }
   }
+}
+
+function parseDurationToMin(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+  }
+  const n = Number(dur)
+  return n > 0 ? Math.round(n / 60) : 0
+}
+
+export async function createTask(task: Omit<DdsTask, 'revision'>): Promise<void> {
+  // If source is custom_input, also create the DdsCustomInput entry
+  if (task.source === 'custom_input') {
+    const durationMin = parseDurationToMin(task.duration)
+    const useHours = durationMin >= 60 && durationMin % 60 === 0
+    mockDdsCustomInputs.push({
+      id: task.task_id,
+      input: task.description ?? '',
+      duration: useHours ? durationMin / 60 : durationMin,
+      time_unit: useHours ? 'hours' : 'minutes',
+      start_time: task.start_time,
+    })
+  }
+  mockDdsTasks.push({ ...task, revision: 0 })
+}
+
+// ── Audit Log (mock) ────────────────────────────────────────────────
+
+const mockAuditLog: AuditLogEntry[] = []
+
+export async function insertAuditLogEntry(entry: {
+  id: string
+  type: string
+  status: string
+  message: string
+  details?: string
+}): Promise<void> {
+  mockAuditLog.push({
+    id: entry.id,
+    timestamp: new Date().toISOString(),
+    type: entry.type,
+    status: entry.status,
+    message: entry.message,
+    details: entry.details ?? null,
+  })
+}
+
+export async function updateAuditLogEntry(
+  id: string,
+  updates: { status?: string; message?: string; details?: string },
+): Promise<void> {
+  const entry = mockAuditLog.find((e) => e.id === id)
+  if (!entry) return
+  if (updates.status !== undefined) entry.status = updates.status
+  if (updates.message !== undefined) entry.message = updates.message
+  if (updates.details !== undefined) entry.details = updates.details
+}
+
+export async function readAuditLogEntries(limit = 200): Promise<AuditLogEntry[]> {
+  return mockAuditLog.slice(-limit)
+}
+
+export async function clearAuditLog(): Promise<void> {
+  mockAuditLog.length = 0
 }

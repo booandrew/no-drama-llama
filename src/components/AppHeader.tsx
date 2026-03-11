@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { clearAllData } from '@/lib/duckdb/queries'
+import { logAction } from '@/store/activity-log'
 import { useAppStore } from '@/store/app'
 
 export function AppHeader() {
@@ -28,11 +29,13 @@ export function AppHeader() {
   const handleClearData = async () => {
     if (!confirm('Clear all DuckDB data? This cannot be undone.')) return
     setClearing(true)
+    logAction('settings', 'info', 'Clearing all data...')
     try {
       await clearAllData()
       window.location.reload()
     } catch (e) {
       console.error('[AppHeader] Clear data failed:', e)
+      logAction('settings', 'error', 'Failed to clear data')
       setClearing(false)
     }
   }

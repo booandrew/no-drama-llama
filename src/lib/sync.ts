@@ -1,3 +1,4 @@
+import { logAction, updateLogEntry } from '@/store/activity-log'
 import {
   upsertSrcJiraIssues,
   upsertSrcJiraWorklogs,
@@ -330,6 +331,7 @@ export interface SyncAllResult {
 }
 
 export async function syncAll(dateStart: string, dateEnd: string): Promise<SyncAllResult> {
+  const logId = logAction('sync', 'pending', 'Syncing all sources...')
   const result: SyncAllResult = {
     jiraIssues: false,
     jiraWorklogs: false,
@@ -361,6 +363,16 @@ export async function syncAll(dateStart: string, dateEnd: string): Promise<SyncA
 
   if (tempo.status === 'fulfilled') result.tempoCapacity = true
   else result.errors.push(`Tempo: ${tempo.reason?.message ?? tempo.reason}`)
+
+  if (result.errors.length === 0) {
+    updateLogEntry(logId, { status: 'success', message: 'All sources synced' })
+  } else {
+    updateLogEntry(logId, {
+      status: 'error',
+      message: `Sync completed with ${result.errors.length} error(s)`,
+      details: result.errors.join('; '),
+    })
+  }
 
   return result
 }
