@@ -29,7 +29,7 @@ interface ActivityLogState {
     status: ActionStatus,
     message: string,
     details?: string,
-  ) => void
+  ) => string
   updateEntry: (id: string, updates: Partial<Pick<LogEntry, 'status' | 'message' | 'details'>>) => void
   clear: () => void
 }
@@ -63,3 +63,7 @@ export const useActivityLogStore = create<ActivityLogState>()((set) => ({
 /** Shorthand for logging from outside React components (e.g. inside Zustand stores) */
 export const logAction = (...args: Parameters<ActivityLogState['logAction']>) =>
   useActivityLogStore.getState().logAction(...args)
+
+/** Shorthand for updating an existing entry from outside React components */
+export const updateLogEntry = (...args: Parameters<ActivityLogState['updateEntry']>) =>
+  useActivityLogStore.getState().updateEntry(...args)

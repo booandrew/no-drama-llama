@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 import { fetchIssues } from '@/lib/jira'
 import type { JiraIssue } from '@/lib/jira'
 import { generateCodeChallenge, generateCodeVerifier } from '@/lib/pkce'
-import { logAction } from '@/store/activity-log'
+import { logAction, updateLogEntry } from '@/store/activity-log'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 export type JiraAuthMethod = 'oauth-org' | 'token'
@@ -124,7 +124,7 @@ export const useJiraStore = create<JiraState>()(
         sessionStorage.removeItem('jira_pkce_verifier')
 
         set({ status: 'loading' })
-        logAction('connection', 'pending', 'Connecting to Jira...')
+        const logId = logAction('connection', 'pending', 'Connecting to Jira...')
         try {
           const res = await fetch('/jira-auth/oauth/token', {
             method: 'POST',
@@ -152,10 +152,10 @@ export const useJiraStore = create<JiraState>()(
             connectionHealth: 'healthy',
             error: null,
           })
-          logAction('connection', 'success', 'Connected to Jira via OAuth')
+          updateLogEntry(logId, { status: 'success', message: 'Connected to Jira via OAuth' })
         } catch (e) {
           console.error('[Jira] OAuth exchange failed:', e)
-          logAction('connection', 'error', 'Failed to connect to Jira')
+          updateLogEntry(logId, { status: 'error', message: 'Failed to connect to Jira' })
           set({ status: 'error', connectionHealth: 'unhealthy', error: (e as Error).message })
         }
       },
@@ -227,17 +227,20 @@ export const useJiraStore = create<JiraState>()(
 
       loadAll: async () => {
         set({ loading: true, error: null })
-        logAction('sync', 'pending', 'Syncing Jira issues...')
+        const logId = logAction('sync', 'pending', 'Syncing Jira issues...')
         try {
           const issues = await fetchIssues()
           set({ issues, loading: false })
-          logAction('sync', 'success', `Loaded ${issues.length} Jira issues`)
+          updateLogEntry(logId, {
+            status: 'success',
+            message: `Loaded ${issues.length} Jira issues`,
+          })
         } catch (e) {
           if ((e as Error).message.includes('401') || (e as Error).message.includes('expired')) {
             get().setExpired()
           }
           set({ error: (e as Error).message, loading: false })
-          logAction('sync', 'error', 'Failed to sync Jira issues')
+          updateLogEntry(logId, { status: 'error', message: 'Failed to sync Jira issues' })
         }
       },
     }),
