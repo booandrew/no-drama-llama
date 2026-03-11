@@ -20,6 +20,7 @@ interface JiraState {
   cloudId: string | null
   accountId: string | null
   connectionHealth: ConnectionHealth
+  expiresAt: number | null
 
   issues: JiraIssue[]
   loading: boolean
@@ -30,6 +31,7 @@ interface JiraState {
   setStatus: (status: JiraStatus) => void
   disconnect: () => Promise<void>
   setExpired: () => void
+  isTokenValid: () => boolean
   exchangeCode: (code: string) => Promise<void>
   startOAuth: () => Promise<void>
   connectWithToken: (siteUrl: string, email: string, apiToken: string) => Promise<void>
@@ -46,6 +48,7 @@ export const useJiraStore = create<JiraState>()(
       cloudId: null,
       accountId: null,
       connectionHealth: 'unknown',
+      expiresAt: null,
 
       _hasHydrated: false,
       setHydrated: () => set({ _hasHydrated: true }),
@@ -56,7 +59,7 @@ export const useJiraStore = create<JiraState>()(
 
       setStatus: (status) => set({ status }),
 
-      disconnect: async () => { {
+      disconnect: async () => {
         try {
           await fetch('/jira-api/.auth/disconnect', { method: 'DELETE' })
         } catch {

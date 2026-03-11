@@ -191,7 +191,7 @@ function PersonalForm({
         onChange={(e) => setClientIdInput(e.target.value)}
       />
       <Button onClick={onConnect} disabled={!gisReady || !clientIdInput.trim()} className="w-full">
-        Connect with Personal Account
+        Connect with Personal App
       </Button>
     </div>
   )

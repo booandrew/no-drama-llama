@@ -97,7 +97,7 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
                 Connect using the {ORG_NAME} organization Jira account.
               </p>
               <Button onClick={connectOrg} className="w-full">
-                Connect with {ORG_NAME}
+                Connect with OAuth
               </Button>
             </TabsContent>
           )}

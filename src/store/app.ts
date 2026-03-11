@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import { logAction } from '@/store/activity-log'
 
 type Tab =
   | 'llama-time'
