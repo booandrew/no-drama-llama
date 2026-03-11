@@ -64,7 +64,7 @@ export const useActivityLogStore = create<ActivityLogState>()((set, get) => ({
       details,
     }
     set((state) => ({
-      entries: [...state.entries, entry].slice(-MAX_ENTRIES),
+      entries: [entry, ...state.entries].slice(0, MAX_ENTRIES),
     }))
     enqueueDb(() =>
       insertAuditLogEntry({

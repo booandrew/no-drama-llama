@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 
-import type { DdsJiraIssue, DdsJiraWorklog, DdsTask, TaskUpdate } from '@/lib/duckdb/queries'
+import type {
+  DdsJiraIssue,
+  DdsJiraWorklog,
+  DdsTask,
+  DdsTempoDailyCapacity,
+  TaskUpdate,
+} from '@/lib/duckdb/queries'
 import * as mockQueries from '@/lib/duckdb/mock-queries'
 import * as queries from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
@@ -9,6 +15,7 @@ interface TasksState {
   tasks: DdsTask[]
   worklogs: DdsJiraWorklog[]
   issues: DdsJiraIssue[]
+  dailyCapacity: DdsTempoDailyCapacity[]
   loading: boolean
   loadTasks: (year: number, month: number) => Promise<void>
   updateTask: (taskId: string, fields: TaskUpdate) => Promise<void>
@@ -24,6 +31,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
   tasks: [],
   worklogs: [],
   issues: [],
+  dailyCapacity: [],
   loading: false,
 
   loadTasks: async (year, month) => {
@@ -31,13 +39,16 @@ export const useTasksStore = create<TasksState>()((set) => ({
     try {
       const dateStart = new Date(year, month, 1).toISOString()
       const dateEnd = new Date(year, month + 1, 1).toISOString()
+      const capStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const capEnd = new Date(year, month + 1, 1).toISOString().slice(0, 10)
       const mod = getQueries()
-      const [tasks, worklogs, issues] = await Promise.all([
+      const [tasks, worklogs, issues, dailyCapacity] = await Promise.all([
         mod.readDdsTasks(dateStart, dateEnd),
         mod.readDdsJiraWorklogs(dateStart, dateEnd),
         mod.readDdsJiraIssues(),
+        mod.readDdsTempoDailyCapacity(capStart, capEnd),
       ])
-      set({ tasks, worklogs, issues })
+      set({ tasks, worklogs, issues, dailyCapacity })
     } finally {
       set({ loading: false })
     }

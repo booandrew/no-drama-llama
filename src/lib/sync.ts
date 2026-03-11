@@ -242,10 +242,12 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
   // Fetch user schedule (workload + holidays) via user-level endpoint
   let workloadSchemes: import('@/lib/tempo').TempoWorkloadScheme[] = []
   let holidaySchemes: import('@/lib/tempo').TempoHolidayScheme[] = []
+  let dailySchedule: import('@/lib/tempo').DaySchedule[] = []
   try {
     const schedule = await fetchUserSchedule(dateStart, dateEnd)
     workloadSchemes = schedule.workload
     holidaySchemes = schedule.holidays
+    dailySchedule = schedule.dailySchedule
   } catch (e) {
     console.warn('[Tempo] User schedule unavailable, using 8h Mon-Fri default:', e)
     workloadSchemes = [
@@ -278,40 +280,40 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
   )
   await upsertSrcTempoHolidays(srcHolidays)
 
-  // Build DDS: daily capacity for each date in period
-  // Use first workload scheme as the default
-  const dayMap = new Map<number, number>()
-  if (workloadSchemes.length > 0) {
-    for (const d of workloadSchemes[0].days) {
-      dayMap.set(d.day, d.requiredSeconds)
+  // Build DDS: use per-day data from Tempo API directly (includes holidays)
+  let dailyCapacity: DdsTempoDailyCapacity[]
+  if (dailySchedule.length > 0) {
+    dailyCapacity = dailySchedule.map((d) => ({
+      date: d.date,
+      day_of_week: new Date(d.date).getDay(),
+      required_seconds: d.requiredSeconds,
+      is_holiday: d.type === 'HOLIDAY' || d.type === 'HOLIDAY_AND_NON_WORKING_DAY',
+      holiday_name: d.holiday?.name ?? null,
+    }))
+  } else {
+    // Fallback: build from workload scheme (8h Mon-Fri default)
+    const dayMap = new Map<number, number>()
+    if (workloadSchemes.length > 0) {
+      for (const d of workloadSchemes[0].days) {
+        dayMap.set(d.day, d.requiredSeconds)
+      }
     }
-  }
-
-  // Build holiday lookup by date
-  const holidayMap = new Map<string, { name: string; durationSeconds: number }>()
-  for (const h of srcHolidays) {
-    holidayMap.set(h.date, { name: h.name, durationSeconds: h.duration_seconds })
-  }
-
-  const dailyCapacity: DdsTempoDailyCapacity[] = []
-  const current = new Date(dateStart)
-  const endDate = new Date(dateEnd)
-
-  while (current < endDate) {
-    const dateStr = current.toISOString().slice(0, 10)
-    const dow = current.getDay()
-    const baseSeconds = dayMap.get(dow) ?? 0
-    const holiday = holidayMap.get(dateStr)
-
-    dailyCapacity.push({
-      date: dateStr,
-      day_of_week: dow,
-      required_seconds: holiday ? Math.max(0, baseSeconds - holiday.durationSeconds) : baseSeconds,
-      is_holiday: !!holiday,
-      holiday_name: holiday?.name ?? null,
-    })
-
-    current.setDate(current.getDate() + 1)
+    dailyCapacity = []
+    const current = new Date(dateStart)
+    const endDate = new Date(dateEnd)
+    endDate.setDate(endDate.getDate() + 1)
+    while (current <= endDate) {
+      const dateStr = current.toISOString().slice(0, 10)
+      const dow = current.getDay()
+      dailyCapacity.push({
+        date: dateStr,
+        day_of_week: dow,
+        required_seconds: dayMap.get(dow) ?? 0,
+        is_holiday: false,
+        holiday_name: null,
+      })
+      current.setDate(current.getDate() + 1)
+    }
   }
 
   await upsertDdsTempoDailyCapacity(dailyCapacity)

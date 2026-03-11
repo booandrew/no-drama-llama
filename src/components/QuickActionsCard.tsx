@@ -45,14 +45,7 @@ export function ActivityLogCard() {
     return () => clearInterval(id)
   }, [])
 
-  // Auto-scroll to bottom when new entries arrive
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [entries.length])
-
-  const visibleEntries = expanded ? entries : entries.slice(-5)
+  const visibleEntries = expanded ? entries : entries.slice(0, 5)
 
   if (!expanded) {
     return (

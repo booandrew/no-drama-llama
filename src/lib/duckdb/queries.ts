@@ -719,10 +719,7 @@ export async function updateAuditLogEntry(
 
 export async function readAuditLogEntries(limit = 200): Promise<AuditLogEntry[]> {
   const result = await exec(`SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`)
-  return result
-    .toArray()
-    .map((r) => r.toJSON() as AuditLogEntry)
-    .reverse()
+  return result.toArray().map((r) => r.toJSON() as AuditLogEntry)
 }
 
 export async function clearAuditLog(): Promise<void> {

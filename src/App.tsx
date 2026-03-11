@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
@@ -15,11 +14,11 @@ import { WoolInsightsTab } from '@/components/WoolInsightsTab'
 
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getProjectTotals, PROJECT_COLORS } from '@/components/insights/mock-data'
 import { useConnectionHealth } from '@/hooks/use-connection-health'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
+import { useTasksStore } from '@/store/tasks'
 
 const summaryChartConfig = {
   hours: { label: 'Hours', color: 'var(--chart-1)' },
@@ -47,24 +46,61 @@ function useOAuthCallback(
   }, [sessionKey, exchangeCode, isRehydrated])
 }
 
-function LlamaSidebar() {
-  const totalHours = 160
-  const [logged, setLogged] = useState(142)
-  const pct = Math.round((logged / totalHours) * 100)
-
-  const randomize = () => {
-    setLogged(Math.floor(Math.random() * (totalHours + 1)))
+function countWeekdays(year: number, month: number): number {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  let count = 0
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay()
+    if (dow !== 0 && dow !== 6) count++
   }
+  return count
+}
+
+function parseDurationSeconds(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 3600 : 0) + (mMatch ? parseInt(mMatch[1]) * 60 : 0)
+  }
+  const n = Number(dur)
+  return n > 0 ? n : 0
+}
+
+function LlamaSidebar() {
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
+  const worklogs = useTasksStore((s) => s.worklogs)
+  const dailyCapacity = useTasksStore((s) => s.dailyCapacity)
+
+  const { loggedHours, expectedHours } = useMemo(() => {
+    let loggedSec = 0
+    for (const wl of worklogs) {
+      loggedSec += parseDurationSeconds(wl.time_spent)
+    }
+
+    let expectedSec = 0
+    if (dailyCapacity.length > 0) {
+      for (const dc of dailyCapacity) {
+        expectedSec += dc.required_seconds
+      }
+    } else {
+      const weekdays = countWeekdays(selectedPeriod.year, selectedPeriod.month)
+      expectedSec = weekdays * 8 * 3600
+    }
+
+    return {
+      loggedHours: Math.round(loggedSec / 3600),
+      expectedHours: Math.round(expectedSec / 3600),
+    }
+  }, [worklogs, dailyCapacity, selectedPeriod.year, selectedPeriod.month])
+
+  const pct = expectedHours > 0 ? Math.min(100, Math.round((loggedHours / expectedHours) * 100)) : 0
 
   return (
     <Card className="self-stretch overflow-hidden">
       <CardContent className="flex flex-1 flex-col items-center gap-3 p-4">
-        <button
-          onClick={randomize}
-          className="cursor-pointer rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
-        >
-          <RefreshCw className="inline size-3.5" /> {logged}h / {totalHours}h logged
-        </button>
+        <div className="rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-md">
+          {loggedHours}h / {expectedHours}h logged
+        </div>
         <div
           className="relative flex w-full flex-1 items-center justify-center"
           role="img"
@@ -91,33 +127,83 @@ function LlamaSidebar() {
   )
 }
 
-const MOCK_ISSUES = [
-  { name: 'PROJ-A-101', hours: 18, color: 'var(--chart-1)' },
-  { name: 'PROJ-A-204', hours: 14, color: 'var(--chart-1)' },
-  { name: 'PROJ-B-55', hours: 12, color: 'var(--chart-2)' },
-  { name: 'PROJ-C-78', hours: 10, color: 'var(--chart-3)' },
-  { name: 'PROJ-A-310', hours: 9, color: 'var(--chart-1)' },
-  { name: 'PROJ-B-42', hours: 8, color: 'var(--chart-2)' },
-  { name: 'PROJ-D-12', hours: 7, color: 'var(--chart-4)' },
-  { name: 'PROJ-E-3', hours: 5, color: 'var(--chart-5)' },
+const CHART_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
 ]
+
+function parseDurationToMin(dur: string): number {
+  const hMatch = dur.match(/(\d+)h/)
+  const mMatch = dur.match(/(\d+)m/)
+  if (hMatch || mMatch) {
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+  }
+  const n = Number(dur)
+  return n > 0 ? Math.round(n / 60) : 0
+}
 
 function SummaryCard() {
   const [view, setView] = useState<'projects' | 'issues'>('projects')
-  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const projectData = useMemo(
-    () => getProjectTotals('month', selectedPeriod.month),
-    [selectedPeriod.month],
-  )
+  const tasks = useTasksStore((s) => s.tasks)
+  const worklogs = useTasksStore((s) => s.worklogs)
+  const issues = useTasksStore((s) => s.issues)
 
-  const chartData =
-    view === 'projects'
-      ? projectData.map((d) => ({
-          name: d.project,
-          hours: d.hours,
-          color: PROJECT_COLORS[d.project] ?? 'var(--chart-1)',
-        }))
-      : MOCK_ISSUES
+  const { projectData, issueData } = useMemo(() => {
+    const issueMap = new Map(issues.map((i) => [i.issue_key, i]))
+
+    // --- Projects: aggregate hours by project_key (skip unassigned) ---
+    const projectMin = new Map<string, number>()
+    for (const t of tasks) {
+      if (!t.project_key) continue
+      projectMin.set(t.project_key, (projectMin.get(t.project_key) ?? 0) + parseDurationToMin(t.duration))
+    }
+    for (const wl of worklogs) {
+      const issue = issueMap.get(wl.issue_key)
+      if (!issue?.project_key) continue
+      projectMin.set(issue.project_key, (projectMin.get(issue.project_key) ?? 0) + parseDurationToMin(wl.time_spent))
+    }
+    const projectData = Array.from(projectMin.entries())
+      .map(([name, min]) => ({ name, hours: +(min / 60).toFixed(1) }))
+      .filter((d) => d.hours > 0)
+      .sort((a, b) => b.hours - a.hours)
+      .map((d, i) => ({ ...d, color: CHART_COLORS[i % CHART_COLORS.length] }))
+
+    // Build project->color map so issues inherit their project's color
+    const projectColorMap = new Map(projectData.map((d) => [d.name, d.color]))
+
+    // --- Issues: aggregate hours by issue_key ---
+    const issueMin = new Map<string, number>()
+    for (const t of tasks) {
+      if (!t.issue_key) continue
+      issueMin.set(t.issue_key, (issueMin.get(t.issue_key) ?? 0) + parseDurationToMin(t.duration))
+    }
+    for (const wl of worklogs) {
+      issueMin.set(
+        wl.issue_key,
+        (issueMin.get(wl.issue_key) ?? 0) + parseDurationToMin(wl.time_spent),
+      )
+    }
+    const issueData = Array.from(issueMin.entries())
+      .map(([key, min]) => {
+        const issue = issueMap.get(key)
+        const pk = issue?.project_key ?? null
+        const color = (pk && projectColorMap.get(pk)) || CHART_COLORS[0]
+        return { name: key, hours: +(min / 60).toFixed(1), color }
+      })
+      .filter((d) => d.hours > 0)
+      .sort((a, b) => b.hours - a.hours)
+
+    return { projectData, issueData }
+  }, [tasks, worklogs, issues])
+
+  const chartData = view === 'projects' ? projectData : issueData
+  const totalHours = useMemo(
+    () => chartData.reduce((s, d) => s + d.hours, 0),
+    [chartData],
+  )
 
   return (
     <Card className="flex flex-1 flex-col gap-0 py-0">
@@ -156,18 +242,30 @@ function SummaryCard() {
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ left: 0, right: 8, top: 4, bottom: 4 }}
+              margin={{ left: 0, right: 0, top: 4, bottom: 4 }}
             >
-              <YAxis
-                dataKey="name"
-                type="category"
-                tickLine={false}
-                axisLine={false}
-                width={view === 'issues' ? 80 : 60}
-                tick={{ fontSize: 11 }}
-              />
+              <YAxis type="category" hide />
               <XAxis type="number" hide />
-              <Bar dataKey="hours" radius={[0, 6, 6, 0]}>
+              <Bar
+                dataKey="hours"
+                radius={[0, 6, 6, 0]}
+                label={({ x, y, height: h, index }: Record<string, unknown>) => (
+                  <text
+                    x={(x as number) + 8}
+                    y={(y as number) + (h as number) / 2}
+                    dominantBaseline="central"
+                    fill="var(--foreground)"
+                    fontSize={11}
+                    fontWeight={600}
+                  >
+                    {chartData[index as number]?.name} — {chartData[index as number]?.hours}h (
+                    {totalHours > 0
+                      ? Math.round(((chartData[index as number]?.hours ?? 0) / totalHours) * 100)
+                      : 0}
+                    %)
+                  </text>
+                )}
+              >
                 {chartData.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
