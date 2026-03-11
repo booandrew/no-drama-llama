@@ -237,9 +237,7 @@ function EventDetailDialog({
     (value: string, query: string) => {
       if (!query) return true
       const iss = issues.find((i) => i.issue_key === value)
-      const str = iss
-        ? `${iss.issue_key} ${iss.issue_name ?? ''}`
-        : String(value ?? '')
+      const str = iss ? `${iss.issue_key} ${iss.issue_name ?? ''}` : String(value ?? '')
       return str.toLowerCase().includes(query.toLowerCase())
     },
     [issues],
@@ -283,7 +281,12 @@ function EventDetailDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(open: boolean) => { if (!open) onClose() }}>
+    <Dialog
+      open
+      onOpenChange={(open: boolean) => {
+        if (!open) onClose()
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg">{meta.name}</DialogTitle>
@@ -343,9 +346,7 @@ function EventDetailDialog({
                     return (
                       <ComboboxItem key={issueKey} value={issueKey}>
                         <span className="font-medium">{issueKey}</span>
-                        <span className="text-muted-foreground truncate">
-                          {issue?.issue_name}
-                        </span>
+                        <span className="text-muted-foreground truncate">{issue?.issue_name}</span>
                       </ComboboxItem>
                     )
                   }}

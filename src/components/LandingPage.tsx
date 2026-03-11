@@ -79,7 +79,9 @@ const PAIN_POINTS = [
 function PainSection() {
   return (
     <section className="mx-auto max-w-5xl px-6 py-24">
-      <h2 className="fade-up mb-12 text-center text-4xl font-bold">The timesheet struggle is real</h2>
+      <h2 className="fade-up mb-12 text-center text-4xl font-bold">
+        The timesheet struggle is real
+      </h2>
       <div className="grid gap-6 sm:grid-cols-3">
         {PAIN_POINTS.map((point) => (
           <Card key={point.title} className="fade-up">
@@ -101,8 +103,7 @@ const STEPS = [
   {
     icon: Calendar,
     title: 'Collect',
-    description:
-      'NoDramaLLama pulls your activity from Google Calendar, Jira issues & worklogs.',
+    description: 'NoDramaLLama pulls your activity from Google Calendar, Jira issues & worklogs.',
   },
   {
     icon: BrainCircuit,
@@ -163,8 +164,7 @@ const FEATURES = [
   {
     icon: GitMerge,
     title: 'Smart Mappings',
-    description:
-      'AI maps calendar events to Jira issues. Learns your patterns over time.',
+    description: 'AI maps calendar events to Jira issues. Learns your patterns over time.',
   },
   {
     icon: Shield,
@@ -267,9 +267,7 @@ function WhatsNextSection() {
                 <item.icon className="size-7 text-primary" />
               </div>
               <h3 className="mb-2 text-base font-bold">{item.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {item.description}
-              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
             </div>
           ))}
         </div>

@@ -97,8 +97,16 @@ export function PeriodSelector({
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-3${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
-      <ToggleGroup type="single" value={periodMode} onValueChange={handleModeChange} size="sm" disabled={disabled}>
+    <div
+      className={`flex flex-wrap items-center gap-3${disabled ? ' opacity-50 pointer-events-none' : ''}`}
+    >
+      <ToggleGroup
+        type="single"
+        value={periodMode}
+        onValueChange={handleModeChange}
+        size="sm"
+        disabled={disabled}
+      >
         <ToggleGroupItem value="day">Day</ToggleGroupItem>
         <ToggleGroupItem value="week">Week</ToggleGroupItem>
         <ToggleGroupItem value="month">Month</ToggleGroupItem>
@@ -107,13 +115,25 @@ export function PeriodSelector({
 
       {periodMode !== 'custom' && (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="size-7" onClick={handlePrev} disabled={disabled}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={handlePrev}
+            disabled={disabled}
+          >
             <ChevronLeft className="size-4" />
           </Button>
           <span className="text-sm font-medium min-w-28 text-center">
             {formatPeriodLabel(periodMode, selectedDate)}
           </span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={handleNext} disabled={disabled}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={handleNext}
+            disabled={disabled}
+          >
             <ChevronRight className="size-4" />
           </Button>
         </div>

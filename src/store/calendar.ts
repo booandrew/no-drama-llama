@@ -132,9 +132,7 @@ export const useCalendarStore = create<CalendarState>()(
             if (!res.ok) {
               if (res.status === 401) {
                 // Try silent GIS refresh before giving up
-                const { trySilentGCalRefresh } = await import(
-                  '@/hooks/use-google-calendar-connect'
-                )
+                const { trySilentGCalRefresh } = await import('@/hooks/use-google-calendar-connect')
                 const refreshed = await trySilentGCalRefresh()
                 if (refreshed) {
                   // Retry the same request with the now-fresh cookie
@@ -207,9 +205,7 @@ export const useCalendarStore = create<CalendarState>()(
           }
 
           // Token expired — attempt silent GIS refresh before marking unhealthy
-          const { trySilentGCalRefresh } = await import(
-            '@/hooks/use-google-calendar-connect'
-          )
+          const { trySilentGCalRefresh } = await import('@/hooks/use-google-calendar-connect')
           const refreshed = await trySilentGCalRefresh()
           if (!refreshed) {
             set({ connectionHealth: 'unhealthy', status: 'expired' })

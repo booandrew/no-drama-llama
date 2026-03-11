@@ -10,12 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import * as realQueries from '@/lib/duckdb/queries'
 import * as mockQueries from '@/lib/duckdb/mock-queries'
-import {
-  syncJiraIssues,
-  syncJiraWorklogs,
-  syncCalendarEvents,
-  syncTempoCapacity,
-} from '@/lib/sync'
+import { syncJiraIssues, syncJiraWorklogs, syncCalendarEvents, syncTempoCapacity } from '@/lib/sync'
 import { initializeDuckDB } from '@/lib/duckdb/init'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { useAppStore } from '@/store/app'
@@ -154,17 +149,13 @@ export function SourcesTab() {
       let rows: Record<string, unknown>[] = []
 
       if (activeSubtab === 'jira-issues') {
-        rows = (
-          activeView === 'raw'
-            ? await q.readSrcJiraIssues()
-            : await q.readDdsJiraIssues()
-        ) as unknown as Record<string, unknown>[]
+        rows = (activeView === 'raw'
+          ? await q.readSrcJiraIssues()
+          : await q.readDdsJiraIssues()) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'jira-worklogs') {
-        rows = (
-          activeView === 'raw'
-            ? await q.readSrcJiraWorklogs(start, end)
-            : await q.readDdsJiraWorklogs(start, end)
-        ) as unknown as Record<string, unknown>[]
+        rows = (activeView === 'raw'
+          ? await q.readSrcJiraWorklogs(start, end)
+          : await q.readDdsJiraWorklogs(start, end)) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'tempo-capacity') {
         if (tempoView === 'workload-days') {
           rows = (await q.readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
@@ -177,11 +168,9 @@ export function SourcesTab() {
           >[]
         }
       } else {
-        rows = (
-          activeView === 'raw'
-            ? await q.readSrcCalendarEvents(start, end)
-            : await q.readDdsCalendarEvents(start, end)
-        ) as unknown as Record<string, unknown>[]
+        rows = (activeView === 'raw'
+          ? await q.readSrcCalendarEvents(start, end)
+          : await q.readDdsCalendarEvents(start, end)) as unknown as Record<string, unknown>[]
       }
 
       setTableData(rows)

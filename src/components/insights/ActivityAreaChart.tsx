@@ -134,7 +134,15 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
             <AreaChart data={totalData} margin={{ left: 0, right: 16 }}>
               <CartesianGrid />
               <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[(min: number) => Math.floor(min * 0.93), (max: number) => Math.ceil(max * 1.07)]} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 12 }}
+                domain={[
+                  (min: number) => Math.floor(min * 0.93),
+                  (max: number) => Math.ceil(max * 1.07),
+                ]}
+              />
               <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
               <Area
                 dataKey="total"
@@ -150,7 +158,15 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
             <AreaChart data={data} margin={{ left: 0, right: 16 }}>
               <CartesianGrid />
               <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[(min: number) => Math.floor(min * 0.93), (max: number) => Math.ceil(max * 1.07)]} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 12 }}
+                domain={[
+                  (min: number) => Math.floor(min * 0.93),
+                  (max: number) => Math.ceil(max * 1.07),
+                ]}
+              />
               <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
               {PROJECTS.map((project) =>
                 activeProjects.has(project) ? (

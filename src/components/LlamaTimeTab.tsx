@@ -19,10 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  useAggregateConnectionStatus,
-  useAllAuthChecked,
-} from '@/hooks/use-connection-health'
+import { useAggregateConnectionStatus, useAllAuthChecked } from '@/hooks/use-connection-health'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
@@ -100,10 +97,7 @@ function hasTasksOutsideWorkHours(tasks: DdsTask[]): boolean {
 }
 
 /** Convert DdsJiraWorklogs to pseudo-DdsTask entries, grouped by (issue_key, day). */
-function worklogsToTasks(
-  worklogs: DdsJiraWorklog[],
-  issues: DdsJiraIssue[],
-): DdsTask[] {
+function worklogsToTasks(worklogs: DdsJiraWorklog[], issues: DdsJiraIssue[]): DdsTask[] {
   const groups = new Map<string, { wls: DdsJiraWorklog[]; totalMin: number }>()
   for (const wl of worklogs) {
     const day = wl.started.split('T')[0]
@@ -297,7 +291,15 @@ function MiniTimeline({
         ))}
 
         {/* 3. Viewport overlay */}
-        <rect x={viewX} y={0} width={viewW} height={MINI_H} fill="var(--chart-1)" opacity={0.15} rx={4} />
+        <rect
+          x={viewX}
+          y={0}
+          width={viewW}
+          height={MINI_H}
+          fill="var(--chart-1)"
+          opacity={0.15}
+          rx={4}
+        />
       </svg>
     </div>
   )
@@ -516,36 +518,42 @@ export function LlamaTimeTab() {
   const [issueColWidth, setIssueColWidth] = useState(140)
   const typeColWidth = 32
 
-  const handleResizeSidebar = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startW = sidebarWidth
-    const minSidebar = typeColWidth + issueColWidth + 100
-    const onMove = (me: MouseEvent) => {
-      setSidebarWidth(Math.max(minSidebar, Math.min(600, startW + me.clientX - startX)))
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [sidebarWidth, issueColWidth])
+  const handleResizeSidebar = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startW = sidebarWidth
+      const minSidebar = typeColWidth + issueColWidth + 100
+      const onMove = (me: MouseEvent) => {
+        setSidebarWidth(Math.max(minSidebar, Math.min(600, startW + me.clientX - startX)))
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [sidebarWidth, issueColWidth],
+  )
 
-  const handleResizeIssueCol = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startW = issueColWidth
-    const onMove = (me: MouseEvent) => {
-      setIssueColWidth(Math.max(80, Math.min(300, startW - (me.clientX - startX))))
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [issueColWidth])
+  const handleResizeIssueCol = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startW = issueColWidth
+      const onMove = (me: MouseEvent) => {
+        setIssueColWidth(Math.max(80, Math.min(300, startW - (me.clientX - startX))))
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [issueColWidth],
+  )
 
   const daysInMonth = new Date(selectedPeriod.year, selectedPeriod.month + 1, 0).getDate()
   const totalMinutes = daysInMonth * effectiveMinutesPerDay
@@ -570,9 +578,7 @@ export function LlamaTimeTab() {
     (value: string, query: string) => {
       if (!query) return true
       const issue = issues.find((i) => i.issue_key === value)
-      const str = issue
-        ? `${issue.issue_key} ${issue.issue_name ?? ''}`
-        : String(value ?? '')
+      const str = issue ? `${issue.issue_key} ${issue.issue_name ?? ''}` : String(value ?? '')
       return str.toLowerCase().includes(query.toLowerCase())
     },
     [issues],
@@ -646,9 +652,7 @@ export function LlamaTimeTab() {
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-4">
       {!hasData && !loading && (
-        <p className="text-muted-foreground text-sm">
-          Select a period or sync data to load tasks.
-        </p>
+        <p className="text-muted-foreground text-sm">Select a period or sync data to load tasks.</p>
       )}
 
       {hasData && (
@@ -687,20 +691,26 @@ export function LlamaTimeTab() {
               </div>
 
               <MiniTimeline
-              year={selectedPeriod.year}
-              month={selectedPeriod.month}
-              totalMinutes={totalMinutes}
-              scrollFraction={scrollFraction}
-              visibleFraction={visibleFraction}
-              onScrollTo={handleScrollTo}
+                year={selectedPeriod.year}
+                month={selectedPeriod.month}
+                totalMinutes={totalMinutes}
+                scrollFraction={scrollFraction}
+                visibleFraction={visibleFraction}
+                onScrollTo={handleScrollTo}
               />
             </div>
           </div>
 
           {/* Day labels header — fixed, syncs horizontal scroll */}
           <div className="flex shrink-0 border-b">
-            <div className="relative flex shrink-0 items-center gap-1.5 border-r pl-2 pr-2" style={{ width: sidebarWidth }}>
-              <span className="shrink-0 px-1 text-xs font-medium text-muted-foreground text-center" style={{ width: typeColWidth }}>
+            <div
+              className="relative flex shrink-0 items-center gap-1.5 border-r pl-2 pr-2"
+              style={{ width: sidebarWidth }}
+            >
+              <span
+                className="shrink-0 px-1 text-xs font-medium text-muted-foreground text-center"
+                style={{ width: typeColWidth }}
+              >
                 Type
               </span>
               <span className="min-w-0 flex-1 border-l pl-1.5 text-xs font-medium text-muted-foreground truncate">
@@ -711,7 +721,10 @@ export function LlamaTimeTab() {
                 style={{ right: issueColWidth + 8 - 1 }}
                 onMouseDown={handleResizeIssueCol}
               />
-              <span className="shrink-0 border-l pl-1.5 text-xs font-medium text-muted-foreground text-center" style={{ width: issueColWidth }}>
+              <span
+                className="shrink-0 border-l pl-1.5 text-xs font-medium text-muted-foreground text-center"
+                style={{ width: issueColWidth }}
+              >
                 Issue Key
               </span>
               <div
@@ -847,10 +860,7 @@ export function LlamaTimeTab() {
         </Card>
       )}
 
-      <ManageConnectionsDialog
-        open={connectDialogOpen}
-        onOpenChange={setConnectDialogOpen}
-      />
+      <ManageConnectionsDialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen} />
     </div>
   )
 }

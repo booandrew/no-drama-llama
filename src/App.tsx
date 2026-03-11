@@ -112,7 +112,11 @@ function SummaryCard() {
 
   const chartData =
     view === 'projects'
-      ? projectData.map((d) => ({ name: d.project, hours: d.hours, color: PROJECT_COLORS[d.project] ?? 'var(--chart-1)' }))
+      ? projectData.map((d) => ({
+          name: d.project,
+          hours: d.hours,
+          color: PROJECT_COLORS[d.project] ?? 'var(--chart-1)',
+        }))
       : MOCK_ISSUES
 
   return (
@@ -149,7 +153,11 @@ function SummaryCard() {
       <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3">
         <div className="min-h-0 flex-1">
           <ChartContainer config={summaryChartConfig} className="h-full w-full">
-            <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ left: 0, right: 8, top: 4, bottom: 4 }}
+            >
               <YAxis
                 dataKey="name"
                 type="category"
@@ -187,7 +195,9 @@ function App() {
     try {
       const stored = JSON.parse(localStorage.getItem('app-store') ?? '{}')
       if (stored?.state?.hasSeenLanding) return 'app'
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return 'landing'
   })
 

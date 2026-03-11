@@ -605,7 +605,11 @@ export async function updateTask(taskId: string, fields: TaskUpdate): Promise<vo
 export async function customInputToTask(
   input: DdsCustomInput,
   revision: number,
-  issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+  issueOverride?: {
+    issue_key: string | null
+    issue_name: string | null
+    project_key: string | null
+  },
 ): Promise<void> {
   // Determine issue: explicit override > preserved from DB > null (let keyword mappings run)
   let issue_key: string | null = null
@@ -663,13 +667,15 @@ export async function createTask(task: Omit<DdsTask, 'revision'>): Promise<void>
   if (task.source === 'custom_input') {
     const durationMin = parseDurationToMin(task.duration)
     const useHours = durationMin >= 60 && durationMin % 60 === 0
-    await upsertDdsCustomInputs([{
-      id: task.task_id,
-      input: task.description ?? '',
-      duration: useHours ? durationMin / 60 : durationMin,
-      time_unit: useHours ? 'hours' : 'minutes',
-      start_time: task.start_time,
-    }])
+    await upsertDdsCustomInputs([
+      {
+        id: task.task_id,
+        input: task.description ?? '',
+        duration: useHours ? durationMin / 60 : durationMin,
+        time_unit: useHours ? 'hours' : 'minutes',
+        start_time: task.start_time,
+      },
+    ])
   }
 
   await upsertTasksWithMappings([fullTask])
@@ -712,9 +718,7 @@ export async function updateAuditLogEntry(
 }
 
 export async function readAuditLogEntries(limit = 200): Promise<AuditLogEntry[]> {
-  const result = await exec(
-    `SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`,
-  )
+  const result = await exec(`SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`)
   return result
     .toArray()
     .map((r) => r.toJSON() as AuditLogEntry)

@@ -83,10 +83,7 @@ export function useAggregateConnectionStatus(): AggregateStatus {
   if (configured.length === 0) return 'none'
 
   const hasUnhealthy = configured.some(
-    (c) =>
-      c.health === 'unhealthy' ||
-      c.status === 'error' ||
-      c.status === 'expired',
+    (c) => c.health === 'unhealthy' || c.status === 'error' || c.status === 'expired',
   )
   return hasUnhealthy ? 'unhealthy' : 'healthy'
 }

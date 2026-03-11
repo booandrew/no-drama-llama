@@ -42,10 +42,7 @@ interface GCalRawEvent {
   htmlLink?: string
 }
 
-async function fetchCalendarEvents(
-  dateStart: string,
-  dateEnd: string,
-): Promise<GCalRawEvent[]> {
+async function fetchCalendarEvents(dateStart: string, dateEnd: string): Promise<GCalRawEvent[]> {
   const all: GCalRawEvent[] = []
   let pageToken: string | undefined
 

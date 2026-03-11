@@ -13,8 +13,7 @@ function StatusDot({ health, status }: { health: ConnectionHealth; status: strin
   if (status === 'idle') {
     return <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/40" />
   }
-  const isUnhealthy =
-    health === 'unhealthy' || status === 'error' || status === 'expired'
+  const isUnhealthy = health === 'unhealthy' || status === 'error' || status === 'expired'
   const color = isUnhealthy ? 'bg-red-500' : 'bg-green-500'
   return <span className={`inline-block size-2 shrink-0 rounded-full ${color}`} />
 }
@@ -101,11 +100,7 @@ export function IntegrationsPopover() {
 
   return (
     <>
-      <div
-        className="relative"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+      <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Blocks className="size-4" />
           Integrations

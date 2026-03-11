@@ -1,9 +1,5 @@
 import type { Period } from '@/store/calendar'
-import {
-  mockDdsJiraWorklogs,
-  mockDdsCalendarEvents,
-  mockDdsTasks,
-} from '@/lib/mock-data'
+import { mockDdsJiraWorklogs, mockDdsCalendarEvents, mockDdsTasks } from '@/lib/mock-data'
 import { getConnection } from './init'
 
 function currentPeriod(): Period {
@@ -59,9 +55,7 @@ export interface LatestDataResult {
  * Returns the latest date with existing DDS data, or null if no data exists.
  * Callers should fall back to "current date" when null.
  */
-export async function getLatestDataDate(
-  isMockMode: boolean,
-): Promise<LatestDataResult | null> {
+export async function getLatestDataDate(isMockMode: boolean): Promise<LatestDataResult | null> {
   const dateStr = isMockMode ? getLatestMockDate() : await getLatestDbDate()
   if (!dateStr) return null
 

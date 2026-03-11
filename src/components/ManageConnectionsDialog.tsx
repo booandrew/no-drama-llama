@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,8 +16,7 @@ import { useTempoStore } from '@/store/tempo'
 function StatusDot({ health, status }: { health: ConnectionHealth; status: string }) {
   if (status === 'idle') return null
 
-  const isUnhealthy =
-    health === 'unhealthy' || status === 'error' || status === 'expired'
+  const isUnhealthy = health === 'unhealthy' || status === 'error' || status === 'expired'
   const color = isUnhealthy ? 'bg-red-500' : 'bg-green-500'
 
   return <span className={`inline-block size-2.5 shrink-0 rounded-full ${color}`} />
@@ -31,8 +25,7 @@ function StatusDot({ health, status }: { health: ConnectionHealth; status: strin
 function StatusBadge({ health, status }: { health: ConnectionHealth; status: string }) {
   if (status === 'idle') return null
 
-  const isUnhealthy =
-    health === 'unhealthy' || status === 'error' || status === 'expired'
+  const isUnhealthy = health === 'unhealthy' || status === 'error' || status === 'expired'
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
@@ -61,9 +54,7 @@ export function ManageConnectionsDialog({ open, onOpenChange, defaultTab }: Prop
       { key: 'jira', status: jiraStatus },
       { key: 'tempo', status: tempoStatus },
     ]
-    const unhealthy = statuses.find(
-      (s) => s.status === 'error' || s.status === 'expired',
-    )
+    const unhealthy = statuses.find((s) => s.status === 'error' || s.status === 'expired')
     if (unhealthy) return unhealthy.key
     return 'gcal'
   }
@@ -85,24 +76,15 @@ export function ManageConnectionsDialog({ open, onOpenChange, defaultTab }: Prop
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
           <TabsList className="w-full">
             <TabsTrigger value="gcal" className="flex-1 gap-1.5">
-              <StatusDot
-                health={useCalendarStore.getState().connectionHealth}
-                status={calStatus}
-              />
+              <StatusDot health={useCalendarStore.getState().connectionHealth} status={calStatus} />
               Google Calendar
             </TabsTrigger>
             <TabsTrigger value="jira" className="flex-1 gap-1.5">
-              <StatusDot
-                health={useJiraStore.getState().connectionHealth}
-                status={jiraStatus}
-              />
+              <StatusDot health={useJiraStore.getState().connectionHealth} status={jiraStatus} />
               Jira
             </TabsTrigger>
             <TabsTrigger value="tempo" className="flex-1 gap-1.5">
-              <StatusDot
-                health={useTempoStore.getState().connectionHealth}
-                status={tempoStatus}
-              />
+              <StatusDot health={useTempoStore.getState().connectionHealth} status={tempoStatus} />
               Tempo
             </TabsTrigger>
           </TabsList>
@@ -230,22 +212,14 @@ function GCalTab() {
               className="flex-1"
               disabled={!gisReady}
               onClick={() => {
-                const clientId =
-                  authMethod === 'org'
-                    ? GCAL_ORG_CLIENT_ID
-                    : readPersonalClientId()
+                const clientId = authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
                 if (clientId) initAndConnect(clientId, authMethod ?? 'org')
               }}
             >
               Re-connect
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={disconnect}
-          >
+          <Button variant="outline" size="sm" className="flex-1" onClick={disconnect}>
             Disconnect
           </Button>
         </div>
@@ -412,12 +386,8 @@ function JiraTab() {
   // Not connected — show connect form
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        Connect Jira to pull issues and worklogs.
-      </p>
-      {hasOrgMethod && (
-        <Button onClick={handleConnectOrg}>Connect with OAuth</Button>
-      )}
+      <p className="text-sm text-muted-foreground">Connect Jira to pull issues and worklogs.</p>
+      {hasOrgMethod && <Button onClick={handleConnectOrg}>Connect with OAuth</Button>}
       {hasOrgMethod && (
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -527,12 +497,8 @@ function TempoTab() {
   }
 
   const jiraSiteUrl = useJiraStore((s) => s.siteUrl)
-  const jiraSiteBase = jiraSiteUrl
-    ? `https://${jiraSiteUrl.replace(/^https?:\/\//, '')}`
-    : null
-  const jiraTempoSettingsUrl = jiraSiteBase
-    ? `${jiraSiteBase}${tempoSettingsPath}`
-    : null
+  const jiraSiteBase = jiraSiteUrl ? `https://${jiraSiteUrl.replace(/^https?:\/\//, '')}` : null
+  const jiraTempoSettingsUrl = jiraSiteBase ? `${jiraSiteBase}${tempoSettingsPath}` : null
 
   const configured = status !== 'idle'
   if (configured) {
@@ -633,10 +599,7 @@ function TempoTab() {
           onChange={(e) => setTokenInput(e.target.value)}
         />
       </div>
-      <Button
-        onClick={handleConnect}
-        disabled={!tokenInput.trim() || connecting}
-      >
+      <Button onClick={handleConnect} disabled={!tokenInput.trim() || connecting}>
         {connecting ? 'Connecting...' : 'Connect to Tempo'}
       </Button>
     </div>

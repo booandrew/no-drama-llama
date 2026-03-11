@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  CheckCircle2,
-  XCircle,
-  Info,
-  Loader2,
-  Maximize2,
-  Minimize2,
-} from 'lucide-react'
+import { CheckCircle2, XCircle, Info, Loader2, Maximize2, Minimize2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { useActivityLogStore, type ActionStatus } from '@/store/activity-log'
@@ -87,9 +80,7 @@ export function ActivityLogCard() {
                 <li key={entry.id} className="flex items-start gap-2 text-xs">
                   {statusIcon(entry.status)}
                   <span className="min-w-0 flex-1 truncate">{entry.message}</span>
-                  <span className="shrink-0 text-muted-foreground">
-                    {timeAgo(entry.timestamp)}
-                  </span>
+                  <span className="shrink-0 text-muted-foreground">{timeAgo(entry.timestamp)}</span>
                 </li>
               ))}
             </ul>
@@ -124,9 +115,7 @@ export function ActivityLogCard() {
               <li key={entry.id} className="flex items-start gap-2 text-xs">
                 {statusIcon(entry.status)}
                 <span className="min-w-0 flex-1">{entry.message}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  {timeAgo(entry.timestamp)}
-                </span>
+                <span className="shrink-0 text-muted-foreground">{timeAgo(entry.timestamp)}</span>
               </li>
             ))}
           </ul>

@@ -58,11 +58,7 @@ async function doInit(): Promise<void> {
       })
       break
     } catch (err) {
-      if (
-        attempt < MAX_RETRIES &&
-        err instanceof Error &&
-        err.message.includes('Access Handle')
-      ) {
+      if (attempt < MAX_RETRIES && err instanceof Error && err.message.includes('Access Handle')) {
         if (import.meta.env.DEV) {
           console.warn(`[DuckDB] OPFS handle busy, retrying (${attempt + 1}/${MAX_RETRIES})…`)
         }

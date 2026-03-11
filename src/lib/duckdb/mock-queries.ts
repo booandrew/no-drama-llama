@@ -109,10 +109,7 @@ export function readDdsTempoDailyCapacity(
   return Promise.resolve(filtered.sort((a, b) => a.date.localeCompare(b.date)))
 }
 
-export function readDdsCustomInputs(
-  dateStart: string,
-  dateEnd: string,
-): Promise<DdsCustomInput[]> {
+export function readDdsCustomInputs(dateStart: string, dateEnd: string): Promise<DdsCustomInput[]> {
   const filtered = mockDdsCustomInputs.filter((ci) => {
     if (!ci.start_time) return false
     return ci.start_time >= dateStart && ci.start_time < dateEnd

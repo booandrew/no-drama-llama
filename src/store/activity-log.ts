@@ -41,13 +41,11 @@ function enqueueDb(fn: () => Promise<void>) {
 interface ActivityLogState {
   entries: LogEntry[]
   loaded: boolean
-  logAction: (
-    type: ActionType,
-    status: ActionStatus,
-    message: string,
-    details?: string,
-  ) => string
-  updateEntry: (id: string, updates: Partial<Pick<LogEntry, 'status' | 'message' | 'details'>>) => void
+  logAction: (type: ActionType, status: ActionStatus, message: string, details?: string) => string
+  updateEntry: (
+    id: string,
+    updates: Partial<Pick<LogEntry, 'status' | 'message' | 'details'>>,
+  ) => void
   clear: () => void
   loadEntries: () => Promise<void>
 }

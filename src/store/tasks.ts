@@ -46,9 +46,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
   updateTask: async (taskId, fields) => {
     // Optimistic local update
     set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.task_id === taskId ? { ...t, ...fields } : t,
-      ),
+      tasks: state.tasks.map((t) => (t.task_id === taskId ? { ...t, ...fields } : t)),
     }))
     // Persist to DB
     const mod = getQueries()
@@ -59,9 +57,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
     const idSet = new Set(taskIds)
     // Optimistic local update — single state change for all tasks
     set((state) => ({
-      tasks: state.tasks.map((t) =>
-        idSet.has(t.task_id) ? { ...t, ...fields } : t,
-      ),
+      tasks: state.tasks.map((t) => (idSet.has(t.task_id) ? { ...t, ...fields } : t)),
     }))
     // Persist all to DB in parallel
     const mod = getQueries()

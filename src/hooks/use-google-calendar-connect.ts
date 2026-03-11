@@ -35,11 +35,9 @@ function ensureTokenClient(): google.accounts.oauth2.TokenClient | null {
         return
       }
       const method = useCalendarStore.getState().authMethod ?? 'org'
-      useCalendarStore.getState().setConnected(
-        response.access_token,
-        Number(response.expires_in) || 3600,
-        method,
-      )
+      useCalendarStore
+        .getState()
+        .setConnected(response.access_token, Number(response.expires_in) || 3600, method)
     },
     error_callback: () => {
       useCalendarStore.getState().setStatus('error')

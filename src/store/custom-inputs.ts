@@ -40,11 +40,19 @@ interface CustomInputsState {
   loadItems: () => Promise<void>
   addItem: (
     item: Omit<DdsCustomInput, 'id'>,
-    issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+    issueOverride?: {
+      issue_key: string | null
+      issue_name: string | null
+      project_key: string | null
+    },
   ) => Promise<void>
   updateItem: (
     item: DdsCustomInput,
-    issueOverride?: { issue_key: string | null; issue_name: string | null; project_key: string | null },
+    issueOverride?: {
+      issue_key: string | null
+      issue_name: string | null
+      project_key: string | null
+    },
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
 }
