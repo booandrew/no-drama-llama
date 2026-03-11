@@ -320,7 +320,7 @@ function JiraTab() {
   const disconnect = useJiraStore((s) => s.disconnect)
   const startOAuth = useJiraStore((s) => s.startOAuth)
   const connectWithToken = useJiraStore((s) => s.connectWithToken)
-  const [siteUrlInput, setSiteUrlInput] = useState('')
+  const [siteUrlInput, setSiteUrlInput] = useState('your-org.atlassian.net')
   const [emailInput, setEmailInput] = useState('')
   const [apiTokenInput, setApiTokenInput] = useState('')
   const [tokenError, setTokenError] = useState<string | null>(null)
@@ -443,7 +443,6 @@ function JiraTab() {
         <div className="flex flex-col gap-2">
           <Input
             id="manage-jira-site"
-            placeholder="your-org.atlassian.net"
             value={siteUrlInput}
             onChange={(e) => setSiteUrlInput(e.target.value)}
             className="border-border"
@@ -488,7 +487,7 @@ function TempoTab() {
   const disconnect = useTempoStore((s) => s.disconnect)
   const setToken = useTempoStore((s) => s.setToken)
   const [tokenInput, setTokenInput] = useState('')
-  const [siteInput, setSiteInput] = useState('')
+  const [siteInput, setSiteInput] = useState('your-org.atlassian.net')
   const [connecting, setConnecting] = useState(false)
 
   const tempoSettingsPath =
@@ -536,10 +535,7 @@ function TempoTab() {
         <div className="flex flex-col gap-2">
           <Label className="text-muted-foreground">Jira site (for settings link)</Label>
           <Input
-            value={siteInput || 'your-org.atlassian.net'}
-            onFocus={() => {
-              if (!siteInput) setSiteInput('your-org.atlassian.net')
-            }}
+            value={siteInput}
             onChange={(e) => setSiteInput(e.target.value)}
             className="h-8 text-xs"
           />

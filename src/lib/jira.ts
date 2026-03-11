@@ -50,16 +50,17 @@ export async function fetchWorklogs(
   const jqlEnd = dateEnd.slice(0, 10)
   const jql = `worklogDate >= "${jqlStart}" AND worklogDate <= "${jqlEnd}" AND worklogAuthor = currentUser()`
   const maxResults = 200
-  let startAt = 0
   const issues: JiraIssue[] = []
+  let nextPageToken: string | undefined
 
-  while (true) {
+  do {
     const params = new URLSearchParams({
       jql,
       fields: 'summary,status,project',
       maxResults: String(maxResults),
-      startAt: String(startAt),
     })
+    if (nextPageToken) params.set('nextPageToken', nextPageToken)
+
     const searchRes = await fetch(`${getBase()}/search/jql?${params}`, {
       headers: headers(),
     })
@@ -80,9 +81,8 @@ export async function fetchWorklogs(
         status: i.fields.status.name,
       })
     }
-    if (startAt + searchData.issues.length >= searchData.total) break
-    startAt += maxResults
-  }
+    nextPageToken = searchData.nextPageToken
+  } while (nextPageToken)
 
   if (issues.length === 0) return { worklogs: [], issues: [] }
 
@@ -131,30 +131,37 @@ export async function fetchIssuesByIds(issueIds: string[]): Promise<JiraIssue[]>
   for (let i = 0; i < issueIds.length; i += 200) {
     const chunk = issueIds.slice(i, i + 200)
     const jql = `id in (${chunk.join(',')})`
-    const params = new URLSearchParams({
-      jql,
-      fields: 'summary,status,project',
-      maxResults: '200',
-    })
-    const res = await fetch(`${getBase()}/search/jql?${params}`, {
-      headers: headers(),
-    })
-    if (res.status === 401) {
-      useJiraStore.getState().setExpired()
-      throw new Error('Jira token expired')
-    }
-    if (!res.ok) throw new Error(`Jira issues by ID: ${res.status}`)
-    const data = await res.json()
-    for (const i of data.issues) {
-      all.push({
-        id: i.id,
-        key: i.key,
-        summary: i.fields.summary,
-        projectKey: i.fields.project.key,
-        projectName: i.fields.project.name,
-        status: i.fields.status.name,
+    let nextPageToken: string | undefined
+
+    do {
+      const params = new URLSearchParams({
+        jql,
+        fields: 'summary,status,project',
+        maxResults: '200',
       })
-    }
+      if (nextPageToken) params.set('nextPageToken', nextPageToken)
+
+      const res = await fetch(`${getBase()}/search/jql?${params}`, {
+        headers: headers(),
+      })
+      if (res.status === 401) {
+        useJiraStore.getState().setExpired()
+        throw new Error('Jira token expired')
+      }
+      if (!res.ok) throw new Error(`Jira issues by ID: ${res.status}`)
+      const data = await res.json()
+      for (const i of data.issues) {
+        all.push({
+          id: i.id,
+          key: i.key,
+          summary: i.fields.summary,
+          projectKey: i.fields.project.key,
+          projectName: i.fields.project.name,
+          status: i.fields.status.name,
+        })
+      }
+      nextPageToken = data.nextPageToken
+    } while (nextPageToken)
   }
   return all
 }
@@ -164,15 +171,16 @@ export async function fetchIssues(): Promise<JiraIssue[]> {
   const jql = `(assignee = "${aid}" OR creator = "${aid}" OR reporter = "${aid}") ORDER BY key ASC`
   const all: JiraIssue[] = []
   const maxResults = 200
-  let startAt = 0
+  let nextPageToken: string | undefined
 
-  while (true) {
+  do {
     const params = new URLSearchParams({
       jql,
       fields: 'summary,status,project',
       maxResults: String(maxResults),
-      startAt: String(startAt),
     })
+    if (nextPageToken) params.set('nextPageToken', nextPageToken)
+
     const res = await fetch(`${getBase()}/search/jql?${params}`, {
       headers: headers(),
     })
@@ -192,9 +200,8 @@ export async function fetchIssues(): Promise<JiraIssue[]> {
         status: i.fields.status.name,
       })
     }
-    if (startAt + data.issues.length >= data.total) break
-    startAt += maxResults
-  }
+    nextPageToken = data.nextPageToken
+  } while (nextPageToken)
 
   return all
 }
