@@ -302,7 +302,7 @@ function GCalTab() {
           disabled={!gisReady || !clientIdInput.trim()}
           variant="outline"
         >
-          Connect with Personal Account
+          Connect with Personal App
         </Button>
       </div>
     </div>
@@ -409,7 +409,7 @@ function JiraTab() {
         Connect Jira to pull issues and worklogs.
       </p>
       {hasOrgMethod && (
-        <Button onClick={handleConnectOrg}>Connect with {ORG_NAME} (OAuth)</Button>
+        <Button onClick={handleConnectOrg}>Connect with OAuth</Button>
       )}
       {hasOrgMethod && (
         <div className="relative">
