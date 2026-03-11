@@ -8,6 +8,7 @@ import { logAction } from '@/store/activity-log'
 
 type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 export type JiraAuthMethod = 'oauth-org' | 'token'
+export type ConnectionHealth = 'unknown' | 'healthy' | 'unhealthy'
 
 const JIRA_SCOPES = 'read:jira-work read:me offline_access'
 const REDIRECT_URI = () => window.location.origin
@@ -18,6 +19,7 @@ interface JiraState {
   authMethod: JiraAuthMethod
   cloudId: string | null
   accountId: string | null
+  connectionHealth: ConnectionHealth
 
   issues: JiraIssue[]
   loading: boolean
@@ -32,6 +34,7 @@ interface JiraState {
   startOAuth: () => Promise<void>
   connectWithToken: (siteUrl: string, email: string, apiToken: string) => Promise<void>
   checkAuthStatus: () => Promise<void>
+  checkHealth: () => Promise<void>
   loadAll: () => Promise<void>
 }
 
@@ -42,6 +45,7 @@ export const useJiraStore = create<JiraState>()(
       authMethod: 'oauth-org',
       cloudId: null,
       accountId: null,
+      connectionHealth: 'unknown',
 
       _hasHydrated: false,
       setHydrated: () => set({ _hasHydrated: true }),
@@ -63,6 +67,7 @@ export const useJiraStore = create<JiraState>()(
           cloudId: null,
           accountId: null,
           status: 'idle',
+          connectionHealth: 'unknown',
           issues: [],
           error: null,
         })
@@ -141,13 +146,14 @@ export const useJiraStore = create<JiraState>()(
             accountId: data.accountId,
             authMethod: data.authMethod ?? 'oauth-org',
             status: 'connected',
+            connectionHealth: 'healthy',
             error: null,
           })
           logAction('connection', 'success', 'Connected to Jira via OAuth')
         } catch (e) {
           console.error('[Jira] OAuth exchange failed:', e)
           logAction('connection', 'error', 'Failed to connect to Jira')
-          set({ status: 'error', error: (e as Error).message })
+          set({ status: 'error', connectionHealth: 'unhealthy', error: (e as Error).message })
         }
       },
 
@@ -170,13 +176,14 @@ export const useJiraStore = create<JiraState>()(
             authMethod: 'token',
             accountId: data.accountId,
             status: 'connected',
+            connectionHealth: 'healthy',
             error: null,
           })
           logAction('connection', 'success', 'Connected to Jira via API token')
         } catch (e) {
           console.error('[Jira] API token connect failed:', e)
           logAction('connection', 'error', 'Failed to connect to Jira')
-          set({ status: 'error', error: (e as Error).message })
+          set({ status: 'error', connectionHealth: 'unhealthy', error: (e as Error).message })
         }
       },
 
@@ -192,11 +199,26 @@ export const useJiraStore = create<JiraState>()(
               accountId: data.accountId ?? null,
               cloudId: data.cloudId ?? null,
             })
+            get().checkHealth()
           } else {
-            set({ status: 'idle' })
+            set({ status: 'idle', connectionHealth: 'unknown' })
           }
         } catch {
           // offline or not deployed yet — keep current state
+        }
+      },
+
+      checkHealth: async () => {
+        const { status } = get()
+        if (status === 'idle') return
+        try {
+          const res = await fetch('/jira-api/.auth/health')
+          if (!res.ok) return
+          const data = await res.json()
+          set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
+          if (!data.healthy) set({ status: 'expired' })
+        } catch {
+          // network error — don't change state
         }
       },
 

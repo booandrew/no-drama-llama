@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useJiraStore } from '@/store/jira'
 
 const ORG_CLIENT_ID = import.meta.env.VITE_JIRA_CLIENT_ID as string | undefined
+const ORG_NAME = (import.meta.env.VITE_ORG_NAME as string) || 'Organization'
 
 interface Props {
   open: boolean
@@ -82,7 +83,7 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
           <TabsList className="w-full">
             {hasOrgMethod && (
               <TabsTrigger value="org" className="flex-1">
-                T1A
+                {ORG_NAME}
               </TabsTrigger>
             )}
             <TabsTrigger value="token" className="flex-1">
@@ -93,10 +94,10 @@ export function JiraConnectDialog({ open, onOpenChange }: Props) {
           {hasOrgMethod && (
             <TabsContent value="org" className="mt-4">
               <p className="text-muted-foreground mb-4 text-sm">
-                Connect using the T1A organization Jira account.
+                Connect using the {ORG_NAME} organization Jira account.
               </p>
               <Button onClick={connectOrg} className="w-full">
-                Connect with T1A
+                Connect with {ORG_NAME}
               </Button>
             </TabsContent>
           )}

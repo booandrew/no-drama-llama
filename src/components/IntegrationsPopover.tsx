@@ -1,173 +1,122 @@
-import { useState } from 'react'
-import { Blocks, RefreshCw } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Blocks, Settings2 } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { GoogleCalendarConnectDialog } from '@/components/GoogleCalendarConnectDialog'
-import { JiraConnectDialog } from '@/components/JiraConnectDialog'
-import { TempoConnectDialog } from '@/components/TempoConnectDialog'
-import { syncAll } from '@/lib/sync'
+import { ManageConnectionsDialog } from '@/components/ManageConnectionsDialog'
+import { useAggregateConnectionStatus } from '@/hooks/use-connection-health'
 import { useCalendarStore } from '@/store/calendar'
+import type { ConnectionHealth } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
 
-const isConnectedStatus = (status: string) =>
-  status === 'connected' || status === 'done' || status === 'loading'
+function StatusDot({ health, status }: { health: ConnectionHealth; status: string }) {
+  if (status === 'idle') {
+    return <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/40" />
+  }
+  const isUnhealthy =
+    health === 'unhealthy' || status === 'error' || status === 'expired'
+  const color = isUnhealthy ? 'bg-red-500' : 'bg-green-500'
+  return <span className={`inline-block size-2 shrink-0 rounded-full ${color}`} />
+}
+
+function AggregateStatusDot() {
+  const aggregate = useAggregateConnectionStatus()
+  if (aggregate === 'none') {
+    return <span className="inline-block size-2 rounded-full bg-muted-foreground/40" />
+  }
+  const color = aggregate === 'unhealthy' ? 'bg-red-500' : 'bg-green-500'
+  return <span className={`inline-block size-2 rounded-full ${color}`} />
+}
 
 export function IntegrationsPopover() {
   const calStatus = useCalendarStore((s) => s.status)
-  const authMethod = useCalendarStore((s) => s.authMethod)
-  const calDisconnect = useCalendarStore((s) => s.disconnect)
+  const calHealth = useCalendarStore((s) => s.connectionHealth)
   const jiraStatus = useJiraStore((s) => s.status)
-  const jiraAuthMethod = useJiraStore((s) => s.authMethod)
-  const jiraDisconnect = useJiraStore((s) => s.disconnect)
+  const jiraHealth = useJiraStore((s) => s.connectionHealth)
   const tempoStatus = useTempoStore((s) => s.status)
-  const tempoDisconnect = useTempoStore((s) => s.disconnect)
-  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const eventsLoading = useCalendarStore((s) => s.eventsLoading)
-  const fetchEvents = useCalendarStore((s) => s.fetchEvents)
-  const [gcalDialogOpen, setGcalDialogOpen] = useState(false)
-  const [jiraDialogOpen, setJiraDialogOpen] = useState(false)
-  const [tempoDialogOpen, setTempoDialogOpen] = useState(false)
-  const [syncingAll, setSyncingAll] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
+  const tempoHealth = useTempoStore((s) => s.connectionHealth)
+  const [manageOpen, setManageOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  const handleSyncAll = async () => {
-    setSyncingAll(true)
-    setSyncError(null)
-    try {
-      const dateStart = new Date(selectedPeriod.year, selectedPeriod.month, 1)
-        .toISOString()
-        .slice(0, 10)
-      const dateEnd = new Date(selectedPeriod.year, selectedPeriod.month + 1, 1)
-        .toISOString()
-        .slice(0, 10)
-      const result = await syncAll(dateStart, dateEnd)
-      if (result.errors.length > 0) {
-        setSyncError(result.errors.join('; '))
-      }
-    } catch (e) {
-      setSyncError((e as Error).message)
-    } finally {
-      setSyncingAll(false)
-    }
+  const handleMouseEnter = () => {
+    clearTimeout(closeTimeoutRef.current)
+    setDropdownOpen(true)
   }
 
-  const isCalConnected = isConnectedStatus(calStatus)
-  const isJiraConnected = isConnectedStatus(jiraStatus)
-  const isTempoConnected = isConnectedStatus(tempoStatus)
+  const handleMouseLeave = () => {
+    closeTimeoutRef.current = setTimeout(() => setDropdownOpen(false), 150)
+  }
 
-  const authLabel = authMethod === 'org' ? 'T1A' : authMethod === 'personal' ? 'Personal' : ''
-  const jiraLabel = jiraAuthMethod === 'token' ? 'Token' : 'OAuth'
+  const statusLabel = (status: string) => {
+    if (status === 'idle') return 'Not connected'
+    if (status === 'expired') return 'Expired'
+    if (status === 'error') return 'Error'
+    return 'Connected'
+  }
 
   return (
     <>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Blocks className="size-4" />
-            Integrations
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-80">
-          <PopoverHeader className="mb-3">
-            <PopoverTitle>Integrations</PopoverTitle>
-          </PopoverHeader>
-          <div className="flex flex-col gap-2">
-            {/* Google Calendar */}
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm font-medium">Google Calendar</span>
-              {isCalConnected ? (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer select-none"
-                  onClick={calDisconnect}
-                >
-                  {authLabel} Connected
-                </Badge>
-              ) : (
-                <Button variant="outline" size="xs" onClick={() => setGcalDialogOpen(true)}>
-                  Connect
-                </Button>
-              )}
+      <div
+        className="relative"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Blocks className="size-4" />
+          Integrations
+          <AggregateStatusDot />
+        </Button>
+        {dropdownOpen && (
+          <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md">
+            <div className="mb-3 flex flex-col gap-1 text-sm">
+              <div className="font-medium">Integrations</div>
             </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot health={calHealth} status={calStatus} />
+                  <span className="text-sm font-medium">Google Calendar</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{statusLabel(calStatus)}</span>
+              </div>
 
-            {/* Jira */}
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm font-medium">Jira</span>
-              {isJiraConnected ? (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer select-none"
-                  onClick={jiraDisconnect}
-                >
-                  {jiraLabel} Connected
-                </Badge>
-              ) : (
-                <Button variant="outline" size="xs" onClick={() => setJiraDialogOpen(true)}>
-                  Connect
-                </Button>
-              )}
-            </div>
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot health={jiraHealth} status={jiraStatus} />
+                  <span className="text-sm font-medium">Jira</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{statusLabel(jiraStatus)}</span>
+              </div>
 
-            {/* Tempo */}
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm font-medium">Tempo</span>
-              {isTempoConnected ? (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer select-none"
-                  onClick={tempoDisconnect}
-                >
-                  Connected
-                </Badge>
-              ) : (
-                <Button variant="outline" size="xs" onClick={() => setTempoDialogOpen(true)}>
-                  Connect
-                </Button>
-              )}
-            </div>
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot health={tempoHealth} status={tempoStatus} />
+                  <span className="text-sm font-medium">Tempo</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{statusLabel(tempoStatus)}</span>
+              </div>
 
-            {/* Sync actions */}
-            {isCalConnected && (
-              <div className="mt-2 flex flex-col gap-1.5 border-t pt-2">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleSyncAll}
-                  disabled={syncingAll}
-                  className="w-full"
-                >
-                  <RefreshCw className={`size-4 ${syncingAll ? 'animate-spin' : ''}`} />
-                  Sync ALL
-                </Button>
+              <div className="mt-2 border-t pt-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={fetchEvents}
-                  disabled={eventsLoading}
-                  className="w-full"
+                  className="w-full gap-1.5"
+                  onClick={() => {
+                    setDropdownOpen(false)
+                    setManageOpen(true)
+                  }}
                 >
-                  <RefreshCw className={`size-4 ${eventsLoading ? 'animate-spin' : ''}`} />
-                  Refresh Google Calendar
+                  <Settings2 className="size-4" />
+                  Manage Connections
                 </Button>
-                {syncError && <p className="text-destructive text-xs">{syncError}</p>}
               </div>
-            )}
+            </div>
           </div>
-        </PopoverContent>
-      </Popover>
+        )}
+      </div>
 
-      <GoogleCalendarConnectDialog open={gcalDialogOpen} onOpenChange={setGcalDialogOpen} />
-      <JiraConnectDialog open={jiraDialogOpen} onOpenChange={setJiraDialogOpen} />
-      <TempoConnectDialog open={tempoDialogOpen} onOpenChange={setTempoDialogOpen} />
+      <ManageConnectionsDialog open={manageOpen} onOpenChange={setManageOpen} />
     </>
   )
 }

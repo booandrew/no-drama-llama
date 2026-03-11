@@ -1,25 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Blocks, RefreshCw, Settings2 } from 'lucide-react'
 import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
 import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
 import { AppHeader } from '@/components/AppHeader'
 import { LandingPage } from '@/components/LandingPage'
 import { CustomInputsTab } from '@/components/CustomInputsTab'
+import { ManageConnectionsDialog } from '@/components/ManageConnectionsDialog'
 import { MappingsTab } from '@/components/MappingsTab'
 import { LlamaTimeTab, LlamaTimeToolbar } from '@/components/LlamaTimeTab'
 import { SourcesTab } from '@/components/SourcesTab'
 import { QuickActionsCard } from '@/components/QuickActionsCard'
 import { WoolInsightsTab } from '@/components/WoolInsightsTab'
+import { Button } from '@/components/ui/button'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getProjectTotals, PROJECT_COLORS } from '@/components/insights/mock-data'
+import { useConnectionHealth } from '@/hooks/use-connection-health'
 import { useDuckDB } from '@/lib/duckdb'
 import { getLatestDataMonth } from '@/lib/duckdb/latest-data-month'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
+import type { ConnectionHealth } from '@/store/calendar'
 import { useCustomInputsStore } from '@/store/custom-inputs'
 import { useJiraStore } from '@/store/jira'
+import { useTempoStore } from '@/store/tempo'
 import { useSourcesStore } from '@/store/sources'
 
 const summaryChartConfig = {
@@ -173,16 +178,140 @@ function SummaryCard() {
   )
 }
 
+const isConnectedStatus = (status: string) =>
+  status === 'connected' || status === 'done' || status === 'loading'
+
+function LlamaTimeContent({ isMockMode }: { isMockMode: boolean }) {
+  const calStatus = useCalendarStore((s) => s.status)
+  const jiraStatus = useJiraStore((s) => s.status)
+  const tempoStatus = useTempoStore((s) => s.status)
+
+  const anyConnected =
+    isMockMode ||
+    isConnectedStatus(calStatus) ||
+    isConnectedStatus(jiraStatus) ||
+    isConnectedStatus(tempoStatus)
+
+  if (!anyConnected) {
+    return <ConnectionsEmptyState />
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-4 min-h-0">
+      <LlamaTimeToolbar />
+      <div className="grid flex-1 min-h-0 grid-cols-[280px_minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
+        <LlamaSidebar />
+        <LlamaTimeTab />
+        <div className="flex flex-col gap-4">
+          <SummaryCard />
+          <Card className="flex-1 gap-0 py-0">
+            <CardHeader className="shrink-0 px-4 py-3">
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4">
+              <p className="text-sm text-muted-foreground">
+                Submit to Jira, auto-fill gaps, export CSV — coming soon.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusDot({ health, status }: { health: ConnectionHealth; status: string }) {
+  if (status === 'idle') {
+    return <span className="inline-block size-2.5 shrink-0 rounded-full bg-muted-foreground/40" />
+  }
+  const isUnhealthy =
+    health === 'unhealthy' || status === 'error' || status === 'expired'
+  const color = isUnhealthy ? 'bg-red-500' : 'bg-green-500'
+  return <span className={`inline-block size-2.5 shrink-0 rounded-full ${color}`} />
+}
+
+function ConnectionsEmptyState() {
+  const [manageOpen, setManageOpen] = useState(false)
+  const calStatus = useCalendarStore((s) => s.status)
+  const calHealth = useCalendarStore((s) => s.connectionHealth)
+  const jiraStatus = useJiraStore((s) => s.status)
+  const jiraHealth = useJiraStore((s) => s.connectionHealth)
+  const tempoStatus = useTempoStore((s) => s.status)
+  const tempoHealth = useTempoStore((s) => s.connectionHealth)
+
+  const integrations = [
+    { name: 'Google Calendar', status: calStatus, health: calHealth },
+    { name: 'Jira', status: jiraStatus, health: jiraHealth },
+    { name: 'Tempo', status: tempoStatus, health: tempoHealth },
+  ]
+
+  const statusLabel = (status: string) => {
+    if (status === 'idle') return 'Not connected'
+    if (status === 'expired') return 'Expired'
+    if (status === 'error') return 'Error'
+    return 'Connected'
+  }
+
+  return (
+    <>
+      <div className="flex flex-1 items-center justify-center">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-xl bg-primary/10">
+              <Blocks className="size-6 text-primary" />
+            </div>
+            <CardTitle>Connect your tools</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {integrations.map((i) => (
+              <div
+                key={i.name}
+                className="flex items-center justify-between rounded-md border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <StatusDot health={i.health} status={i.status} />
+                  <span className="text-sm font-medium">{i.name}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{statusLabel(i.status)}</span>
+              </div>
+            ))}
+            <Button
+              className="mt-2 w-full gap-1.5"
+              onClick={() => setManageOpen(true)}
+            >
+              <Settings2 className="size-4" />
+              Manage Connections
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+      <ManageConnectionsDialog open={manageOpen} onOpenChange={setManageOpen} />
+    </>
+  )
+}
+
 function App() {
   const activeTab = useAppStore((s) => s.activeTab)
   const isMockMode = useAppStore((s) => s.isMockMode)
   const jiraExchangeCode = useJiraStore((s) => s.exchangeCode)
   const jiraHydrated = useJiraStore((s) => s._hasHydrated)
+  const setHasSeenLanding = useAppStore((s) => s.setHasSeenLanding)
   useOAuthCallback('jira_oauth_state', jiraExchangeCode, jiraHydrated)
+  useConnectionHealth()
 
-  const [page, setPage] = useState(() => (window.location.hash === '#app' ? 'app' : 'landing'))
+  // Show landing only if user hasn't seen it yet and isn't explicitly navigating to #app
+  const [page, setPage] = useState<'landing' | 'app'>(() => {
+    if (window.location.hash === '#app') return 'app'
+    // Check localStorage directly for initial render (zustand hydration is async)
+    try {
+      const stored = JSON.parse(localStorage.getItem('app-store') ?? '{}')
+      if (stored?.state?.hasSeenLanding) return 'app'
+    } catch { /* ignore */ }
+    return 'landing'
+  })
 
   const goToApp = () => {
+    setHasSeenLanding()
     window.location.hash = '#app'
     setPage('app')
   }

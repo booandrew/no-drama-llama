@@ -15,6 +15,7 @@ import { useCalendarStore } from '@/store/calendar'
 import type { CalendarAuthMethod } from '@/store/calendar'
 
 const ORG_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
+const ORG_NAME = (import.meta.env.VITE_ORG_NAME as string) || 'Organization'
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 
 function useGisReady() {
@@ -111,7 +112,7 @@ export function GoogleCalendarConnectDialog({ open, onOpenChange }: Props) {
           <Tabs defaultValue={defaultTab}>
             <TabsList className="w-full">
               <TabsTrigger value="org" className="flex-1">
-                T1A
+                {ORG_NAME}
               </TabsTrigger>
               <TabsTrigger value="personal" className="flex-1">
                 Personal
@@ -119,10 +120,10 @@ export function GoogleCalendarConnectDialog({ open, onOpenChange }: Props) {
             </TabsList>
             <TabsContent value="org" className="mt-4">
               <p className="text-muted-foreground mb-4 text-sm">
-                Connect using the T1A organization Google account.
+                Connect using the {ORG_NAME} organization Google account.
               </p>
               <Button onClick={connectOrg} disabled={!gisReady} className="w-full">
-                Connect with T1A
+                Connect with {ORG_NAME}
               </Button>
             </TabsContent>
             <TabsContent value="personal" className="mt-4">

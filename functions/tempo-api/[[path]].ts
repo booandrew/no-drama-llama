@@ -23,6 +23,11 @@ export const onRequest: PagesFunction = async (context) => {
     return handleDisconnect()
   }
 
+  // GET .auth/health
+  if (request.method === 'GET' && path === '.auth/health') {
+    return handleHealth(request)
+  }
+
   // All other paths: inject auth from cookies
   const accessToken = getCookie(request, 'tempo_access_token')
   if (!accessToken) {
@@ -69,6 +74,22 @@ function handleStatus(request: Request): Response {
     JSON.stringify({ connected }),
     { headers: { 'Content-Type': 'application/json' } },
   )
+}
+
+async function handleHealth(request: Request): Promise<Response> {
+  const accessToken = getCookie(request, 'tempo_access_token')
+  if (!accessToken) {
+    return Response.json({ healthy: false, error: 'No access token' })
+  }
+  try {
+    const res = await fetch('https://api.tempo.io/4/work-attributes', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    })
+    if (res.ok) return Response.json({ healthy: true })
+    return Response.json({ healthy: false, error: `Tempo API: ${res.status}` })
+  } catch (e) {
+    return Response.json({ healthy: false, error: (e as Error).message })
+  }
 }
 
 function handleDisconnect(): Response {

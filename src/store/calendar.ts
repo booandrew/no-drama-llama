@@ -4,6 +4,7 @@ import { logAction } from '@/store/activity-log'
 
 type CalendarStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired'
 export type CalendarAuthMethod = 'org' | 'personal'
+export type ConnectionHealth = 'unknown' | 'healthy' | 'unhealthy'
 
 export interface CalendarEvent {
   id: string
@@ -31,6 +32,7 @@ interface CalendarState {
   status: CalendarStatus
   authMethod: CalendarAuthMethod | null
   personalClientId: string | null
+  connectionHealth: ConnectionHealth
   selectedPeriod: Period
   events: CalendarEvent[]
   eventsLoading: boolean
@@ -43,6 +45,7 @@ interface CalendarState {
   setSelectedPeriod: (period: Period) => void
   fetchEvents: () => Promise<void>
   checkAuthStatus: () => Promise<void>
+  checkHealth: () => Promise<void>
 }
 
 export const useCalendarStore = create<CalendarState>()(
@@ -51,6 +54,7 @@ export const useCalendarStore = create<CalendarState>()(
       status: 'idle',
       authMethod: null,
       personalClientId: null,
+      connectionHealth: 'unknown',
       selectedPeriod: currentPeriod(),
       events: [],
       eventsLoading: false,
@@ -63,10 +67,10 @@ export const useCalendarStore = create<CalendarState>()(
             body: JSON.stringify({ accessToken, expiresIn, authMethod: method }),
           })
           if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
-          set({ authMethod: method, status: 'connected' })
+          set({ authMethod: method, status: 'connected', connectionHealth: 'healthy' })
         } catch (e) {
           console.error('[Calendar] Connect failed:', e)
-          set({ status: 'error' })
+          set({ status: 'error', connectionHealth: 'unhealthy' })
         }
       },
 
@@ -86,6 +90,7 @@ export const useCalendarStore = create<CalendarState>()(
           authMethod: null,
           personalClientId: null,
           status: 'idle',
+          connectionHealth: 'unknown',
           events: [],
         })
       },
@@ -153,11 +158,26 @@ export const useCalendarStore = create<CalendarState>()(
               status: 'connected',
               authMethod: data.authMethod ?? null,
             })
+            get().checkHealth()
           } else {
-            set({ status: 'idle' })
+            set({ status: 'idle', connectionHealth: 'unknown' })
           }
         } catch {
           // offline or not deployed yet
+        }
+      },
+
+      checkHealth: async () => {
+        const { status } = get()
+        if (status === 'idle') return
+        try {
+          const res = await fetch('/gcal-api/.auth/health')
+          if (!res.ok) return
+          const data = await res.json()
+          set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
+          if (!data.healthy) set({ status: 'expired' })
+        } catch {
+          // network error — don't change state
         }
       },
     }),

@@ -3,9 +3,11 @@ import { create } from 'zustand'
 import { logAction } from '@/store/activity-log'
 
 type TempoStatus = 'idle' | 'connected' | 'error' | 'expired'
+export type ConnectionHealth = 'unknown' | 'healthy' | 'unhealthy'
 
 interface TempoState {
   status: TempoStatus
+  connectionHealth: ConnectionHealth
   error: string | null
 
   setToken: (token: string) => Promise<void>
@@ -13,10 +15,12 @@ interface TempoState {
   setExpired: () => void
   disconnect: () => Promise<void>
   checkAuthStatus: () => Promise<void>
+  checkHealth: () => Promise<void>
 }
 
-export const useTempoStore = create<TempoState>()((set) => ({
+export const useTempoStore = create<TempoState>()((set, get) => ({
   status: 'idle',
+  connectionHealth: 'unknown',
   error: null,
 
   setToken: async (token) => {
@@ -28,9 +32,9 @@ export const useTempoStore = create<TempoState>()((set) => ({
         body: JSON.stringify({ token }),
       })
       if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
-      set({ status: 'connected', error: null })
+      set({ status: 'connected', connectionHealth: 'healthy', error: null })
     } catch (e) {
-      set({ status: 'error', error: (e as Error).message })
+      set({ status: 'error', connectionHealth: 'unhealthy', error: (e as Error).message })
     }
   },
 
@@ -49,7 +53,7 @@ export const useTempoStore = create<TempoState>()((set) => ({
     } catch {
       // best-effort
     }
-    set({ status: 'idle', error: null })
+    set({ status: 'idle', connectionHealth: 'unknown', error: null })
   },
 
   checkAuthStatus: async () => {
@@ -59,9 +63,24 @@ export const useTempoStore = create<TempoState>()((set) => ({
       const data = await res.json()
       if (data.connected) {
         set({ status: 'connected' })
+        get().checkHealth()
       }
     } catch {
       // offline or not deployed yet
+    }
+  },
+
+  checkHealth: async () => {
+    const { status } = get()
+    if (status === 'idle') return
+    try {
+      const res = await fetch('/tempo-api/.auth/health')
+      if (!res.ok) return
+      const data = await res.json()
+      set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
+      if (!data.healthy) set({ status: 'expired' })
+    } catch {
+      // network error — don't change state
     }
   },
 }))

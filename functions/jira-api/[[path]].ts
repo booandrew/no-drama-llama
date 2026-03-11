@@ -24,6 +24,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return handleDisconnect()
   }
 
+  // GET .auth/health
+  if (request.method === 'GET' && path === '.auth/health') {
+    return handleHealth(request, env, url)
+  }
+
   // All other paths: inject auth from cookies
   const accessToken = getCookie(request, 'jira_access_token')
 
@@ -71,6 +76,89 @@ function handleStatus(request: Request): Response {
     JSON.stringify({ connected, authMethod, accountId, cloudId }),
     { headers: { 'Content-Type': 'application/json' } },
   )
+}
+
+async function handleHealth(request: Request, env: Env, url: URL): Promise<Response> {
+  const authMethod = getCookie(request, 'jira_auth_method')
+  if (!authMethod) {
+    return Response.json({ healthy: false, error: 'Not configured' })
+  }
+
+  try {
+    if (authMethod === 'token') {
+      const email = getCookie(request, 'jira_email')
+      const apiToken = getCookie(request, 'jira_api_token')
+      const siteUrl = getCookie(request, 'jira_site_url')
+      if (!email || !apiToken || !siteUrl) {
+        return Response.json({ healthy: false, error: 'Missing token credentials' })
+      }
+      const basic = btoa(`${email}:${apiToken}`)
+      const res = await fetch(`https://${siteUrl}/rest/api/3/myself`, {
+        headers: { Authorization: `Basic ${basic}`, Accept: 'application/json' },
+      })
+      if (res.ok) return Response.json({ healthy: true })
+      return Response.json({ healthy: false, error: `Jira API: ${res.status}` })
+    }
+
+    // OAuth flow
+    let accessToken = getCookie(request, 'jira_access_token')
+    if (!accessToken) {
+      // Try refresh
+      const refreshToken = getCookie(request, 'jira_refresh_token')
+      const clientId = getCookie(request, JIRA_CLIENT_ID_COOKIE)
+      if (refreshToken && clientId && env.JIRA_CLIENT_SECRET) {
+        const refreshRes = await fetch('https://auth.atlassian.com/oauth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grant_type: 'refresh_token',
+            client_id: clientId,
+            client_secret: env.JIRA_CLIENT_SECRET,
+            refresh_token: refreshToken,
+          }),
+        })
+        if (refreshRes.ok) {
+          const data = await refreshRes.json<{
+            access_token: string
+            refresh_token: string
+            expires_in: number
+          }>()
+          accessToken = data.access_token
+          // Update cookies in the health response
+          const cookieOpts = { url }
+          const headers = new Headers({ 'Content-Type': 'application/json' })
+          headers.append(
+            'Set-Cookie',
+            setCookie('jira_access_token', data.access_token, {
+              ...cookieOpts,
+              maxAge: data.expires_in,
+            }),
+          )
+          headers.append(
+            'Set-Cookie',
+            setCookie('jira_refresh_token', data.refresh_token, cookieOpts),
+          )
+          // Verify with refreshed token
+          const meRes = await fetch('https://api.atlassian.com/me', {
+            headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' },
+          })
+          return new Response(
+            JSON.stringify({ healthy: meRes.ok, error: meRes.ok ? undefined : `Jira API: ${meRes.status}` }),
+            { headers },
+          )
+        }
+      }
+      return Response.json({ healthy: false, error: 'Token expired, refresh failed' })
+    }
+
+    const res = await fetch('https://api.atlassian.com/me', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    })
+    if (res.ok) return Response.json({ healthy: true })
+    return Response.json({ healthy: false, error: `Jira API: ${res.status}` })
+  } catch (e) {
+    return Response.json({ healthy: false, error: (e as Error).message })
+  }
 }
 
 function handleDisconnect(): Response {

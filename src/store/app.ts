@@ -16,6 +16,8 @@ interface AppState {
   setActiveTab: (tab: Tab) => void
   isMockMode: boolean
   toggleMockMode: () => void
+  hasSeenLanding: boolean
+  setHasSeenLanding: () => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -24,16 +26,16 @@ export const useAppStore = create<AppState>()(
       activeTab: 'llama-time',
       setActiveTab: (activeTab) => set({ activeTab }),
       isMockMode: false,
-      toggleMockMode: () =>
-        set((state) => {
-          const next = !state.isMockMode
-          logAction('settings', 'info', next ? 'Switched to mock data' : 'Switched to real data')
-          return { isMockMode: next }
-        }),
+      toggleMockMode: () => set((state) => ({ isMockMode: !state.isMockMode })),
+      hasSeenLanding: false,
+      setHasSeenLanding: () => set({ hasSeenLanding: true }),
     }),
     {
       name: 'app-store',
-      partialize: (state) => ({ isMockMode: state.isMockMode }),
+      partialize: (state) => ({
+        isMockMode: state.isMockMode,
+        hasSeenLanding: state.hasSeenLanding,
+      }),
     },
   ),
 )
