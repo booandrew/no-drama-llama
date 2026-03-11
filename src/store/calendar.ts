@@ -126,6 +126,21 @@ export const useCalendarStore = create<CalendarState>()(
 
             if (!res.ok) {
               if (res.status === 401) {
+                // Try silent GIS refresh before giving up
+                const { trySilentGCalRefresh } = await import(
+                  '@/hooks/use-google-calendar-connect'
+                )
+                const refreshed = await trySilentGCalRefresh()
+                if (refreshed) {
+                  // Retry the same request with the now-fresh cookie
+                  const retry = await fetch(`${CALENDAR_API}?${params}`)
+                  if (retry.ok) {
+                    const data = await retry.json()
+                    allEvents.push(...(data.items ?? []))
+                    pageToken = data.nextPageToken
+                    continue
+                  }
+                }
                 get().setExpired()
                 set({ eventsLoading: false })
                 logAction('sync', 'error', 'Google Calendar token expired')
@@ -174,8 +189,19 @@ export const useCalendarStore = create<CalendarState>()(
           const res = await fetch('/gcal-api/.auth/health')
           if (!res.ok) return
           const data = await res.json()
-          set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
-          if (!data.healthy) set({ status: 'expired' })
+          if (data.healthy) {
+            set({ connectionHealth: 'healthy' })
+            return
+          }
+
+          // Token expired — attempt silent GIS refresh before marking unhealthy
+          const { trySilentGCalRefresh } = await import(
+            '@/hooks/use-google-calendar-connect'
+          )
+          const refreshed = await trySilentGCalRefresh()
+          if (!refreshed) {
+            set({ connectionHealth: 'unhealthy', status: 'expired' })
+          }
         } catch {
           // network error — don't change state
         }
