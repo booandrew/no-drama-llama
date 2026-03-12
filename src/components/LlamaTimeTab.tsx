@@ -27,7 +27,8 @@ import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useTasksStore } from '@/store/tasks'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import type { ViewMode } from '@/store/app'
 import { toast } from 'sonner'
 
 const MINUTES_PER_DAY = 1440
@@ -310,11 +311,31 @@ function MiniTimeline({
 // ---------------------------------------------------------------------------
 export function LlamaTimeToolbar() {
   const isMockMode = useAppStore((s) => s.isMockMode)
+  const viewMode = useAppStore((s) => s.viewMode)
+  const setViewMode = useAppStore((s) => s.setViewMode)
+  const selectedDate = useAppStore((s) => s.selectedDate)
+  const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
   const loadTasks = useTasksStore((s) => s.loadTasks)
   const aggregateStatus = useAggregateConnectionStatus()
   const [syncing, setSyncing] = useState(false)
+
+  const navigateDay = (offset: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + offset)
+    setSelectedDate(d.toISOString().slice(0, 10))
+  }
+
+  const navigateWeek = (offset: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + offset * 7)
+    setSelectedDate(d.toISOString().slice(0, 10))
+  }
+
+  const goToToday = () => {
+    setSelectedDate(new Date().toISOString().slice(0, 10))
+  }
 
   const handleLoadSources = useCallback(async () => {
     setSyncing(true)
@@ -342,45 +363,89 @@ export function LlamaTimeToolbar() {
     }
   }, [selectedPeriod, loadTasks])
 
+  const showMonthYearPickers = viewMode === 'list' || viewMode === 'month'
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(selectedPeriod.month)}
-            onValueChange={(v) =>
-              setSelectedPeriod({ year: selectedPeriod.year, month: Number(v) })
-            }
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTH_NAMES.map((name, i) => (
-                <SelectItem key={i} value={String(i)}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-3">
+          {/* View mode tabs */}
+          <div className="flex items-center gap-1 rounded-lg border p-0.5">
+            {(['month', 'week', 'day', 'list'] as ViewMode[]).map((mode) => (
+              <Button
+                key={mode}
+                variant={viewMode === mode ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-3 text-xs capitalize"
+                onClick={() => setViewMode(mode)}
+              >
+                {mode}
+              </Button>
+            ))}
+          </div>
 
-          <Select
-            value={String(selectedPeriod.year)}
-            onValueChange={(v) =>
-              setSelectedPeriod({ year: Number(v), month: selectedPeriod.month })
-            }
-          >
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Context-dependent controls */}
+          {showMonthYearPickers ? (
+            <div className="flex items-center gap-2">
+              <Select
+                value={String(selectedPeriod.month)}
+                onValueChange={(v) =>
+                  setSelectedPeriod({ year: selectedPeriod.year, month: Number(v) })
+                }
+              >
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTH_NAMES.map((name, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={String(selectedPeriod.year)}
+                onValueChange={(v) =>
+                  setSelectedPeriod({ year: Number(v), month: selectedPeriod.month })
+                }
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => (viewMode === 'week' ? navigateWeek(-1) : navigateDay(-1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={goToToday}>
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => (viewMode === 'week' ? navigateWeek(1) : navigateDay(1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -401,9 +466,11 @@ export function LlamaTimeToolbar() {
                 )}
                 Load Sources
               </Button>
-              <Button variant="default" size="sm" disabled>
-                I'm good with timelogs, Submit to JIRA
-              </Button>
+              {showMonthYearPickers && (
+                <Button variant="default" size="sm" disabled>
+                  I'm good with timelogs, Submit to JIRA
+                </Button>
+              )}
             </>
           )}
         </div>
