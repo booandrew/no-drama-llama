@@ -38,7 +38,7 @@ interface CalendarState {
   events: CalendarEvent[]
   eventsLoading: boolean
 
-  setConnected: (accessToken: string, expiresIn: number, method: CalendarAuthMethod) => void
+  setConnected: (method: CalendarAuthMethod) => void
   setPersonalClientId: (clientId: string) => void
   setStatus: (status: CalendarStatus) => void
   setExpired: () => void
@@ -61,21 +61,9 @@ export const useCalendarStore = create<CalendarState>()(
       events: [],
       eventsLoading: false,
 
-      setConnected: async (accessToken, expiresIn, method) => {
-        try {
-          const res = await fetch('/gcal-api/.auth/connect', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accessToken, expiresIn, authMethod: method }),
-          })
-          if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
-          set({ authMethod: method, status: 'connected', connectionHealth: 'healthy' })
-          logAction('connection', 'success', 'Connected to Google Calendar')
-        } catch (e) {
-          console.error('[Calendar] Connect failed:', e)
-          logAction('connection', 'error', 'Failed to connect to Google Calendar')
-          set({ status: 'error', connectionHealth: 'unhealthy' })
-        }
+      setConnected: (method) => {
+        set({ authMethod: method, status: 'connected', connectionHealth: 'healthy' })
+        logAction('connection', 'success', 'Connected to Google Calendar')
       },
 
       setPersonalClientId: (clientId) => set({ personalClientId: clientId }),
@@ -131,19 +119,7 @@ export const useCalendarStore = create<CalendarState>()(
 
             if (!res.ok) {
               if (res.status === 401) {
-                // Try silent GIS refresh before giving up
-                const { trySilentGCalRefresh } = await import('@/hooks/use-google-calendar-connect')
-                const refreshed = await trySilentGCalRefresh()
-                if (refreshed) {
-                  // Retry the same request with the now-fresh cookie
-                  const retry = await fetch(`${CALENDAR_API}?${params}`)
-                  if (retry.ok) {
-                    const data = await retry.json()
-                    allEvents.push(...(data.items ?? []))
-                    pageToken = data.nextPageToken
-                    continue
-                  }
-                }
+                // Server-side refresh failed — token is invalid
                 get().setExpired()
                 set({ eventsLoading: false })
                 updateLogEntry(logId, { status: 'error', message: 'Google Calendar token expired' })
@@ -204,12 +180,8 @@ export const useCalendarStore = create<CalendarState>()(
             return
           }
 
-          // Token expired — attempt silent GIS refresh before marking unhealthy
-          const { trySilentGCalRefresh } = await import('@/hooks/use-google-calendar-connect')
-          const refreshed = await trySilentGCalRefresh()
-          if (!refreshed) {
-            set({ connectionHealth: 'unhealthy', status: 'expired' })
-          }
+          // Server-side refresh failed — mark as expired
+          set({ connectionHealth: 'unhealthy', status: 'expired' })
         } catch {
           // network error — don't change state
         }

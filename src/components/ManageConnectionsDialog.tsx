@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useGoogleCalendarConnect } from '@/hooks/use-google-calendar-connect'
 import { useCalendarStore } from '@/store/calendar'
 import type { CalendarAuthMethod, ConnectionHealth } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
@@ -111,7 +112,6 @@ const ORG_NAME = (import.meta.env.VITE_ORG_NAME as string) || 'Organization'
 // ── Google Calendar Tab ───────────────────────────────────────────────
 
 const GCAL_ORG_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 
 function useGisReady() {
   const [ready, setReady] = useState(!!window.google?.accounts?.oauth2)
@@ -144,32 +144,26 @@ function GCalTab() {
   const authMethod = useCalendarStore((s) => s.authMethod)
   const health = useCalendarStore((s) => s.connectionHealth)
   const disconnect = useCalendarStore((s) => s.disconnect)
-  const setConnected = useCalendarStore((s) => s.setConnected)
   const setPersonalClientId = useCalendarStore((s) => s.setPersonalClientId)
-  const setStatus = useCalendarStore((s) => s.setStatus)
 
   const gisReady = useGisReady()
-  const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null)
   const [clientIdInput, setClientIdInput] = useState(() => readPersonalClientId())
+  const [clientSecretInput, setClientSecretInput] = useState('')
 
+  const { connect } = useGoogleCalendarConnect()
   const hasOrgMethod = !!GCAL_ORG_CLIENT_ID
 
-  function initAndConnect(clientId: string, method: CalendarAuthMethod) {
+  function initAndConnect(
+    clientId: string,
+    method: CalendarAuthMethod,
+    clientSecret?: string,
+    forceConsent?: boolean,
+  ) {
     if (!gisReady) return
-    tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: GCAL_SCOPES,
-      callback: (response) => {
-        if (response.error) {
-          setStatus('error')
-          return
-        }
-        if (method === 'personal') setPersonalClientId(clientId)
-        setConnected(response.access_token, Number(response.expires_in) || 3600, method)
-      },
-      error_callback: () => setStatus('error'),
-    })
-    tokenClientRef.current.requestAccessToken()
+    if (method === 'personal') {
+      setPersonalClientId(clientId)
+    }
+    connect(clientId, method, clientSecret, forceConsent)
   }
 
   const configured = status !== 'idle'
@@ -208,8 +202,9 @@ function GCalTab() {
               className="flex-1"
               disabled={!gisReady}
               onClick={() => {
-                const clientId = authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
-                if (clientId) initAndConnect(clientId, authMethod ?? 'org')
+                const clientId =
+                  authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
+                if (clientId) initAndConnect(clientId, authMethod ?? 'org', undefined, true)
               }}
             >
               Re-connect
@@ -230,7 +225,10 @@ function GCalTab() {
         Connect Google Calendar to pull your events for timesheet mapping.
       </p>
       {hasOrgMethod && (
-        <Button onClick={() => initAndConnect(GCAL_ORG_CLIENT_ID!, 'org')} disabled={!gisReady}>
+        <Button
+          onClick={() => initAndConnect(GCAL_ORG_CLIENT_ID!, 'org', undefined, true)}
+          disabled={!gisReady}
+        >
           Connect with {ORG_NAME}
         </Button>
       )}
@@ -262,11 +260,11 @@ function GCalTab() {
             </li>
             <li>Create a project, enable Google Calendar API</li>
             <li>
-              Create OAuth 2.0 credentials, add{' '}
+              Create OAuth 2.0 credentials (Web application), add{' '}
               <code className="bg-muted rounded px-1 text-xs">{window.location.origin}</code> to
-              origins
+              authorized origins
             </li>
-            <li>Copy the Client ID below</li>
+            <li>Copy the Client ID and Client Secret below</li>
           </ol>
         </div>
         <Input
@@ -274,9 +272,17 @@ function GCalTab() {
           value={clientIdInput}
           onChange={(e) => setClientIdInput(e.target.value)}
         />
+        <Input
+          type="password"
+          placeholder="Client Secret"
+          value={clientSecretInput}
+          onChange={(e) => setClientSecretInput(e.target.value)}
+        />
         <Button
-          onClick={() => initAndConnect(clientIdInput.trim(), 'personal')}
-          disabled={!gisReady || !clientIdInput.trim()}
+          onClick={() =>
+            initAndConnect(clientIdInput.trim(), 'personal', clientSecretInput.trim(), true)
+          }
+          disabled={!gisReady || !clientIdInput.trim() || !clientSecretInput.trim()}
           variant="outline"
         >
           Connect with Personal App
