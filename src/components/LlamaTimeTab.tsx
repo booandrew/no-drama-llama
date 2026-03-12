@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { DayCalendarView } from '@/components/calendar-views/DayCalendarView'
+import { MonthCalendarView } from '@/components/calendar-views/MonthCalendarView'
+import { WeekCalendarView } from '@/components/calendar-views/WeekCalendarView'
 import { ManageConnectionsDialog } from '@/components/ManageConnectionsDialog'
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
@@ -484,6 +487,8 @@ export function LlamaTimeToolbar() {
 // ---------------------------------------------------------------------------
 export function LlamaTimeTab() {
   const isMockMode = useAppStore((s) => s.isMockMode)
+  const viewMode = useAppStore((s) => s.viewMode)
+  const selectedDate = useAppStore((s) => s.selectedDate)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const { isReady } = useDuckDB()
 
@@ -723,206 +728,238 @@ export function LlamaTimeTab() {
 
       {hasData && (
         <Card className="flex flex-1 min-h-0 flex-col">
-          {/* Card header: title + zoom switcher + mini-view */}
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="leading-none font-semibold">Wool Work</span>
-              <span className="text-xs text-muted-foreground">
-                Map your calendar events to projects
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                {(
-                  [
-                    [1, 'Day'],
-                    [7, 'Week'],
-                    [14, 'Bi-Week'],
-                    [daysInMonth, 'Month'],
-                  ] as [number, string][]
-                ).map(([days, label], i, arr) => {
-                  const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
-                  const isActive = visibleDays > prevMax && visibleDays <= days
-                  return (
-                    <Button
-                      key={label}
-                      variant={isActive ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setVisibleDaysClamped(days)}
-                    >
-                      {label}
-                    </Button>
-                  )
-                })}
-              </div>
-
-              <MiniTimeline
-                year={selectedPeriod.year}
-                month={selectedPeriod.month}
-                totalMinutes={totalMinutes}
-                scrollFraction={scrollFraction}
-                visibleFraction={visibleFraction}
-                onScrollTo={handleScrollTo}
-              />
-            </div>
-          </div>
-
-          {/* Day labels header — fixed, syncs horizontal scroll */}
-          <div className="flex shrink-0 border-b">
-            <div
-              className="relative flex shrink-0 items-center gap-1.5 border-r pl-2 pr-2"
-              style={{ width: sidebarWidth }}
-            >
-              <span
-                className="shrink-0 px-1 text-xs font-medium text-muted-foreground text-center"
-                style={{ width: typeColWidth }}
-              >
-                Type
-              </span>
-              <span className="min-w-0 flex-1 border-l pl-1.5 text-xs font-medium text-muted-foreground truncate">
-                Name
-              </span>
-              <div
-                className="absolute top-0 h-full w-3 cursor-col-resize z-20 hover:bg-border/60"
-                style={{ right: issueColWidth + 8 - 1 }}
-                onMouseDown={handleResizeIssueCol}
-              />
-              <span
-                className="shrink-0 border-l pl-1.5 text-xs font-medium text-muted-foreground text-center"
-                style={{ width: issueColWidth }}
-              >
-                Issue Key
-              </span>
-              <div
-                className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-border/60 z-20"
-                onMouseDown={handleResizeSidebar}
-              />
-            </div>
-            <div ref={dayLabelsRef} className="flex-1 overflow-hidden" onWheel={forwardWheel}>
-              <div
-                style={{
-                  minWidth: `${chartWidthPercent}%`,
-                  transition: 'min-width 120ms ease-out',
-                }}
-              >
-                <div className="flex h-8" style={{ marginRight: 20 }}>
-                  {Array.from({ length: daysInMonth }, (_, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 text-center text-xs text-muted-foreground leading-8"
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
+          {viewMode === 'list' && (
+            <>
+              {/* Card header: title + zoom switcher + mini-view */}
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="leading-none font-semibold">Wool Work</span>
+                  <span className="text-xs text-muted-foreground">
+                    Map your calendar events to projects
+                  </span>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Scrollable body: task names + chart */}
-          <div className="flex flex-1 min-h-0">
-            {/* Task names column — synced vertical scroll */}
-            <div
-              ref={taskNamesRef}
-              className="shrink-0 overflow-hidden border-r bg-card z-10"
-              style={{ width: sidebarWidth }}
-              onWheel={forwardWheel}
-            >
-              <div className="flex flex-col" style={{ height: chartBodyHeight }}>
-                <div style={{ height: 10, flexShrink: 0 }} />
-                <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
-                  {taskGroups.map((group) => {
-                    const cfg = TYPE_CONFIG[group.type]
-                    return (
-                      <div
-                        key={group.key}
-                        className="flex flex-1 items-center gap-1.5 pl-2 pr-2"
-                        title={group.desc}
-                      >
-                        <span
-                          className={`shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
-                          style={{ width: typeColWidth }}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    {(
+                      [
+                        [1, 'Day'],
+                        [7, 'Week'],
+                        [14, 'Bi-Week'],
+                        [daysInMonth, 'Month'],
+                      ] as [number, string][]
+                    ).map(([days, label], i, arr) => {
+                      const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
+                      const isActive = visibleDays > prevMax && visibleDays <= days
+                      return (
+                        <Button
+                          key={label}
+                          variant={isActive ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => setVisibleDaysClamped(days)}
                         >
-                          {cfg.label}
-                        </span>
-                        <span className="min-w-0 flex-1 text-sm text-muted-foreground truncate">
-                          {group.desc}
-                        </span>
-                        {group.readonly ? (
-                          <Input
-                            className="h-7 shrink-0 text-xs"
-                            style={{ width: issueColWidth }}
-                            value={group.issueKey ?? ''}
-                            disabled
-                          />
-                        ) : (
-                          <Combobox
-                            value={group.issueKey}
-                            onValueChange={(val) =>
-                              handleGroupIssueChange(group.taskIds, val as string | null)
-                            }
-                            filter={issueFilter}
-                            items={issueKeys}
-                          >
-                            <ComboboxInput
-                              placeholder="—"
-                              className="h-7 shrink-0 text-xs"
-                              style={{ width: issueColWidth }}
-                              showClear={!!group.issueKey}
-                            />
-                            <ComboboxContent className="min-w-64">
-                              <ComboboxEmpty>No issues found</ComboboxEmpty>
-                              <ComboboxList className="max-h-60">
-                                {(issueKey: string) => {
-                                  const issue = issues.find((i) => i.issue_key === issueKey)
-                                  return (
-                                    <ComboboxItem
-                                      key={issueKey}
-                                      value={issueKey}
-                                      className="whitespace-nowrap"
-                                    >
-                                      <span className="font-medium shrink-0">{issueKey}</span>
-                                      <span className="text-muted-foreground truncate">
-                                        {issue?.issue_name}
-                                      </span>
-                                    </ComboboxItem>
-                                  )
-                                }}
-                              </ComboboxList>
-                            </ComboboxContent>
-                          </Combobox>
-                        )}
-                      </div>
-                    )
-                  })}
+                          {label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+
+                  <MiniTimeline
+                    year={selectedPeriod.year}
+                    month={selectedPeriod.month}
+                    totalMinutes={totalMinutes}
+                    scrollFraction={scrollFraction}
+                    visibleFraction={visibleFraction}
+                    onScrollTo={handleScrollTo}
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Chart body — main scroll container */}
-            <div ref={chartBodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
-              <div
-                style={{
-                  minWidth: `${chartWidthPercent}%`,
-                  transition: 'min-width 120ms ease-out',
-                }}
-              >
-                <TimelineChart
-                  tasks={allTasks}
-                  issues={issues}
-                  onTaskUpdate={updateTask}
-                  onAddTask={addTask}
-                  year={selectedPeriod.year}
-                  month={selectedPeriod.month}
-                  hideYAxis
-                  hideXAxis
-                  effectiveMinutesPerDay={effectiveMinutesPerDay}
-                  workStartMinute={workStartMinute}
-                  barColors={barColors}
-                />
+              {/* Day labels header — fixed, syncs horizontal scroll */}
+              <div className="flex shrink-0 border-b">
+                <div
+                  className="relative flex shrink-0 items-center gap-1.5 border-r pl-2 pr-2"
+                  style={{ width: sidebarWidth }}
+                >
+                  <span
+                    className="shrink-0 px-1 text-xs font-medium text-muted-foreground text-center"
+                    style={{ width: typeColWidth }}
+                  >
+                    Type
+                  </span>
+                  <span className="min-w-0 flex-1 border-l pl-1.5 text-xs font-medium text-muted-foreground truncate">
+                    Name
+                  </span>
+                  <div
+                    className="absolute top-0 h-full w-3 cursor-col-resize z-20 hover:bg-border/60"
+                    style={{ right: issueColWidth + 8 - 1 }}
+                    onMouseDown={handleResizeIssueCol}
+                  />
+                  <span
+                    className="shrink-0 border-l pl-1.5 text-xs font-medium text-muted-foreground text-center"
+                    style={{ width: issueColWidth }}
+                  >
+                    Issue Key
+                  </span>
+                  <div
+                    className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-border/60 z-20"
+                    onMouseDown={handleResizeSidebar}
+                  />
+                </div>
+                <div ref={dayLabelsRef} className="flex-1 overflow-hidden" onWheel={forwardWheel}>
+                  <div
+                    style={{
+                      minWidth: `${chartWidthPercent}%`,
+                      transition: 'min-width 120ms ease-out',
+                    }}
+                  >
+                    <div className="flex h-8" style={{ marginRight: 20 }}>
+                      {Array.from({ length: daysInMonth }, (_, i) => (
+                        <div
+                          key={i}
+                          className="flex-1 text-center text-xs text-muted-foreground leading-8"
+                        >
+                          {i + 1}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+
+              {/* Scrollable body: task names + chart */}
+              <div className="flex flex-1 min-h-0">
+                {/* Task names column — synced vertical scroll */}
+                <div
+                  ref={taskNamesRef}
+                  className="shrink-0 overflow-hidden border-r bg-card z-10"
+                  style={{ width: sidebarWidth }}
+                  onWheel={forwardWheel}
+                >
+                  <div className="flex flex-col" style={{ height: chartBodyHeight }}>
+                    <div style={{ height: 10, flexShrink: 0 }} />
+                    <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
+                      {taskGroups.map((group) => {
+                        const cfg = TYPE_CONFIG[group.type]
+                        return (
+                          <div
+                            key={group.key}
+                            className="flex flex-1 items-center gap-1.5 pl-2 pr-2"
+                            title={group.desc}
+                          >
+                            <span
+                              className={`shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
+                              style={{ width: typeColWidth }}
+                            >
+                              {cfg.label}
+                            </span>
+                            <span className="min-w-0 flex-1 text-sm text-muted-foreground truncate">
+                              {group.desc}
+                            </span>
+                            {group.readonly ? (
+                              <Input
+                                className="h-7 shrink-0 text-xs"
+                                style={{ width: issueColWidth }}
+                                value={group.issueKey ?? ''}
+                                disabled
+                              />
+                            ) : (
+                              <Combobox
+                                value={group.issueKey}
+                                onValueChange={(val) =>
+                                  handleGroupIssueChange(group.taskIds, val as string | null)
+                                }
+                                filter={issueFilter}
+                                items={issueKeys}
+                              >
+                                <ComboboxInput
+                                  placeholder="—"
+                                  className="h-7 shrink-0 text-xs"
+                                  style={{ width: issueColWidth }}
+                                  showClear={!!group.issueKey}
+                                />
+                                <ComboboxContent className="min-w-64">
+                                  <ComboboxEmpty>No issues found</ComboboxEmpty>
+                                  <ComboboxList className="max-h-60">
+                                    {(issueKey: string) => {
+                                      const issue = issues.find((i) => i.issue_key === issueKey)
+                                      return (
+                                        <ComboboxItem
+                                          key={issueKey}
+                                          value={issueKey}
+                                          className="whitespace-nowrap"
+                                        >
+                                          <span className="font-medium shrink-0">{issueKey}</span>
+                                          <span className="text-muted-foreground truncate">
+                                            {issue?.issue_name}
+                                          </span>
+                                        </ComboboxItem>
+                                      )
+                                    }}
+                                  </ComboboxList>
+                                </ComboboxContent>
+                              </Combobox>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chart body — main scroll container */}
+                <div ref={chartBodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
+                  <div
+                    style={{
+                      minWidth: `${chartWidthPercent}%`,
+                      transition: 'min-width 120ms ease-out',
+                    }}
+                  >
+                    <TimelineChart
+                      tasks={allTasks}
+                      issues={issues}
+                      onTaskUpdate={updateTask}
+                      onAddTask={addTask}
+                      year={selectedPeriod.year}
+                      month={selectedPeriod.month}
+                      hideYAxis
+                      hideXAxis
+                      effectiveMinutesPerDay={effectiveMinutesPerDay}
+                      workStartMinute={workStartMinute}
+                      barColors={barColors}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+          {viewMode === 'month' && (
+            <MonthCalendarView
+              year={selectedPeriod.year}
+              month={selectedPeriod.month}
+              tasks={allTasks}
+              worklogs={worklogs}
+              issues={issues}
+              onTaskClick={() => {}}
+            />
+          )}
+          {viewMode === 'week' && (
+            <WeekCalendarView
+              selectedDate={selectedDate}
+              tasks={allTasks}
+              worklogs={worklogs}
+              issues={issues}
+              onTaskClick={() => {}}
+            />
+          )}
+          {viewMode === 'day' && (
+            <DayCalendarView
+              selectedDate={selectedDate}
+              tasks={allTasks}
+              worklogs={worklogs}
+              issues={issues}
+              onTaskClick={() => {}}
+            />
+          )}
         </Card>
       )}
 
