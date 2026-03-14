@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import {
   ChartContainer,
@@ -7,25 +7,26 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PROJECTS, PROJECT_COLORS } from './mock-data'
-
-const projectChartConfig = Object.fromEntries(
-  PROJECTS.map((p) => [p, { label: p, color: PROJECT_COLORS[p] }]),
-) satisfies ChartConfig
+interface Props {
+  data: Record<string, string | number>[]
+  periodLabel: string
+  xAxisLabel: string
+  projects: string[]
+  projectColors: Record<string, string>
+}
 
 const allChartConfig: ChartConfig = {
   total: { label: 'Total', color: 'var(--foreground)' },
 }
 
-interface Props {
-  data: Record<string, string | number>[]
-  periodLabel: string
-  xAxisLabel: string
-}
-
-export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
+export function ActivityAreaChart({ data, periodLabel, xAxisLabel, projects, projectColors }: Props) {
   const [mode, setMode] = useState<'all' | 'projects'>('all')
-  const [activeProjects, setActiveProjects] = useState<Set<string>>(new Set(PROJECTS))
+  const [activeProjects, setActiveProjects] = useState<Set<string>>(new Set(projects))
+
+  useEffect(() => {
+    setMode('all')
+    setActiveProjects(new Set(projects))
+  }, [projects])
 
   const toggleProject = (project: string) => {
     if (mode === 'all') {
@@ -48,30 +49,38 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
 
   const selectAll = () => {
     setMode('all')
-    setActiveProjects(new Set(PROJECTS))
+    setActiveProjects(new Set(projects))
   }
+
+  const projectChartConfig = useMemo(
+    () =>
+      Object.fromEntries(
+        projects.map((p) => [p, { label: p, color: projectColors[p] }]),
+      ) satisfies ChartConfig,
+    [projects, projectColors],
+  )
 
   const totalData = useMemo(
     () =>
       data.map((row) => ({
         month: row.month,
-        total: PROJECTS.reduce((sum, p) => sum + (Number(row[p]) || 0), 0),
+        total: projects.reduce((sum, p) => sum + (Number(row[p]) || 0), 0),
       })),
-    [data],
+    [data, projects],
   )
 
   const resolvedColors = useMemo(() => {
     const map: Record<string, string> = {}
     if (typeof window === 'undefined') return map
     const style = getComputedStyle(document.documentElement)
-    for (const project of PROJECTS) {
-      const match = PROJECT_COLORS[project].match(/var\((.+)\)/)
+    for (const project of projects) {
+      const match = projectColors[project]?.match(/var\((.+)\)/)
       if (match) {
         map[project] = style.getPropertyValue(match[1]).trim()
       }
     }
     return map
-  }, [])
+  }, [projects, projectColors])
 
   return (
     <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
@@ -100,9 +109,9 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
           >
             All
           </button>
-          {PROJECTS.map((project) => {
+          {projects.map((project) => {
             const isActive = mode === 'projects' && activeProjects.has(project)
-            const color = resolvedColors[project] || PROJECT_COLORS[project]
+            const color = resolvedColors[project] || projectColors[project]
             return (
               <button
                 key={project}
@@ -168,7 +177,7 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel }: Props) {
                 ]}
               />
               <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
-              {PROJECTS.map((project) =>
+              {projects.map((project) =>
                 activeProjects.has(project) ? (
                   <Area
                     key={project}
