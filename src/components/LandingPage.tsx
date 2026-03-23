@@ -20,12 +20,13 @@ import {
   Shield,
 } from 'lucide-react'
 
-import llamaSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
+import { getCurrentLlama } from '@/lib/llama-avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useScrollReveal } from '@/hooks/use-scroll-reveal'
 
 function HeroSection({ onEnterApp }: { onEnterApp: () => void }) {
+  const llamaSvg = getCurrentLlama()
   return (
     <section className="flex min-h-svh flex-col items-center justify-center gap-6 px-6 text-center">
       <h1 className="text-6xl font-bold tracking-tight sm:text-7xl">

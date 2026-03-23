@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { EventBlock } from '@/components/calendar-views/EventBlock'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
+import { EventBlock } from './EventBlock'
 
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -72,24 +72,31 @@ export function MonthCalendarView({
           const isToday = dateStr === today
           const dayTasks = tasksByDate.get(dateStr) ?? []
 
+          const maxVisible = 3
+
           return (
             <div
               key={i}
-              className={`border-b border-r p-1 min-h-24 ${!cell.inMonth ? 'bg-muted/30' : ''}`}
+              className={`flex flex-col overflow-hidden border-b border-r p-1 min-h-24 ${!cell.inMonth ? 'bg-muted/30' : ''}`}
             >
               <div
-                className={`mb-0.5 text-sm ${isToday ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold' : cell.inMonth ? 'font-medium' : 'text-muted-foreground'}`}
+                className={`mb-0.5 text-right text-sm ${isToday ? 'inline-flex h-6 w-6 items-center justify-center self-end rounded-full bg-primary text-primary-foreground font-bold' : cell.inMonth ? 'font-medium' : 'text-muted-foreground'}`}
               >
                 {cell.date.getDate()}
               </div>
-              <div className="space-y-0.5">
-                {dayTasks.slice(0, 4).map((t) => (
-                  <EventBlock key={t.task_id} task={t} compact onClick={onTaskClick} />
+              <div className="flex flex-col gap-0.5 min-h-0 overflow-hidden">
+                {dayTasks.slice(0, maxVisible).map((t) => (
+                  <EventBlock
+                    key={t.task_id}
+                    task={t}
+                    compact
+                    onClick={onTaskClick}
+                  />
                 ))}
-                {dayTasks.length > 4 && (
-                  <div className="text-[10px] text-muted-foreground px-1">
-                    +{dayTasks.length - 4} more
-                  </div>
+                {dayTasks.length > maxVisible && (
+                  <span className="text-xs text-muted-foreground/70 pl-2.5">
+                    +{dayTasks.length - maxVisible} more
+                  </span>
                 )}
               </div>
             </div>

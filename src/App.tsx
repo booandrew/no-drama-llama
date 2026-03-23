@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
-import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
+import { getCurrentLlama } from '@/lib/llama-avatar'
 import { AppHeader } from '@/components/AppHeader'
 import { LandingPage } from '@/components/LandingPage'
 import { CustomInputsTab } from '@/components/CustomInputsTab'
@@ -70,6 +70,10 @@ function LlamaSidebar() {
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const worklogs = useTasksStore((s) => s.worklogs)
   const dailyCapacity = useTasksStore((s) => s.dailyCapacity)
+  const llamaAvatarSvg = useMemo(
+    () => getCurrentLlama(),
+    [],
+  )
 
   const { loggedHours, expectedHours } = useMemo(() => {
     let loggedSec = 0
@@ -106,12 +110,12 @@ function LlamaSidebar() {
           role="img"
           aria-label="Llama Avatar"
         >
-          <div className="relative max-h-48 overflow-hidden">
+          <div className="relative h-48 w-full">
             {/* Greyscale layer (unfilled) */}
             <img
               src={llamaAvatarSvg}
               alt=""
-              className="block h-full w-full object-contain opacity-30 grayscale"
+              className="absolute inset-0 block h-full w-full object-contain opacity-30 grayscale"
             />
             {/* Colored layer (filled from bottom) */}
             <img

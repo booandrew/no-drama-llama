@@ -41,7 +41,7 @@ export function EventBlock({ task, style, className = '', compact, onClick }: Ev
   if (compact) {
     return (
       <button
-        className={`w-full truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight border ${colors.bg} ${colors.border} ${colors.text} ${className}`}
+        className={`w-full min-w-0 overflow-hidden truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight border ${colors.bg} ${colors.border} ${colors.text} ${className}`}
         style={style}
         onClick={() => onClick?.(task)}
         title={title}

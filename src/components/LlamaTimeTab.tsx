@@ -16,6 +16,12 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -533,13 +539,11 @@ export function LlamaTimeTab() {
 
   const issueKeys = useMemo(() => issues.map((i) => i.issue_key), [issues])
 
-  const handleCalendarTaskClick = useCallback(
-    (task: DdsTask) => {
-      setSelectedDate(task.start_time.slice(0, 10))
-      setViewMode('list')
-    },
-    [setSelectedDate, setViewMode],
-  )
+  const [detailTask, setDetailTask] = useState<DdsTask | null>(null)
+
+  const handleCalendarTaskClick = useCallback((task: DdsTask) => {
+    setDetailTask(task)
+  }, [])
 
   const use24h = useMemo(() => hasTasksOutsideWorkHours(allTasks), [allTasks])
   const effectiveMinutesPerDay = use24h ? MINUTES_PER_DAY : WORK_MINUTES_PER_DAY
@@ -968,6 +972,141 @@ export function LlamaTimeTab() {
       )}
 
       <ManageConnectionsDialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen} />
+
+      {/* Task detail dialog — opened from calendar views */}
+      <Dialog open={!!detailTask} onOpenChange={(open) => !open && setDetailTask(null)}>
+        <DialogContent className="sm:max-w-md">
+          {detailTask && (
+            <TaskDetailContent
+              task={detailTask}
+              issues={issues}
+              issueKeys={issueKeys}
+              issueFilter={issueFilter}
+              onIssueChange={async (issueKey) => {
+                const issue = issues.find((i) => i.issue_key === issueKey)
+                await updateTasks([detailTask.task_id], {
+                  issue_key: issueKey,
+                  issue_name: issue?.issue_name ?? null,
+                  project_key: issue?.project_key ?? null,
+                })
+                setDetailTask({
+                  ...detailTask,
+                  issue_key: issueKey,
+                  issue_name: issue?.issue_name ?? null,
+                  project_key: issue?.project_key ?? null,
+                })
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+function TaskDetailContent({
+  task,
+  issues,
+  issueKeys,
+  issueFilter,
+  onIssueChange,
+}: {
+  task: DdsTask
+  issues: DdsJiraIssue[]
+  issueKeys: string[]
+  issueFilter: (value: string, query: string) => boolean
+  onIssueChange: (issueKey: string | null) => void
+}) {
+  const type = getRowType(task.source)
+  const cfg = TYPE_CONFIG[type]
+  const isReadonly = type === 'worklog'
+  const title = task.description ?? '(no title)'
+  const date = task.start_time ? new Date(task.start_time) : null
+  const dur = task.duration ? minutesToDurationStr(parseDuration(task.duration)) : null
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <span
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${cfg.className}`}
+          >
+            {cfg.label}
+          </span>
+          <span className="truncate">{title}</span>
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="flex flex-col gap-3 text-sm">
+        {date && (
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Date</span>
+            <span>
+              {date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+              {', '}
+              {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+        {dur && (
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Duration</span>
+            <span>{dur}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Source</span>
+          <span className="capitalize">{task.source.replace('_', ' ')}</span>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-muted-foreground">Issue Key</span>
+          {isReadonly ? (
+            <Input
+              className="h-8 text-sm"
+              value={task.issue_key ?? ''}
+              disabled
+            />
+          ) : (
+            <Combobox
+              value={task.issue_key}
+              onValueChange={(val) => onIssueChange(val as string | null)}
+              filter={issueFilter}
+              items={issueKeys}
+            >
+              <ComboboxInput
+                placeholder="Assign issue..."
+                className="h-8 text-sm"
+                showClear={!!task.issue_key}
+              />
+              <ComboboxContent className="min-w-64">
+                <ComboboxEmpty>No issues found</ComboboxEmpty>
+                <ComboboxList className="max-h-60">
+                  {(issueKey: string) => {
+                    const issue = issues.find((i) => i.issue_key === issueKey)
+                    return (
+                      <ComboboxItem
+                        key={issueKey}
+                        value={issueKey}
+                        className="whitespace-nowrap"
+                      >
+                        <span className="font-medium shrink-0">{issueKey}</span>
+                        <span className="text-muted-foreground truncate">
+                          {issue?.issue_name}
+                        </span>
+                      </ComboboxItem>
+                    )
+                  }}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
