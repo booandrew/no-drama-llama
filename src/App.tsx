@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, XAxis, YAxis } from 'recharts'
 
-import llamaAvatarSvg from '@/assets/73897352_JEMA LUIS 283-03.svg'
+import { getCurrentLlama } from '@/lib/llama-avatar'
 import { AppHeader } from '@/components/AppHeader'
 import { LandingPage } from '@/components/LandingPage'
 import { CustomInputsTab } from '@/components/CustomInputsTab'
@@ -70,6 +70,10 @@ function LlamaSidebar() {
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const worklogs = useTasksStore((s) => s.worklogs)
   const dailyCapacity = useTasksStore((s) => s.dailyCapacity)
+  const llamaAvatarSvg = useMemo(
+    () => getCurrentLlama(),
+    [],
+  )
 
   const { loggedHours, expectedHours } = useMemo(() => {
     let loggedSec = 0
@@ -96,28 +100,28 @@ function LlamaSidebar() {
   const pct = expectedHours > 0 ? Math.min(100, Math.round((loggedHours / expectedHours) * 100)) : 0
 
   return (
-    <Card className="self-stretch overflow-hidden">
-      <CardContent className="flex flex-1 flex-col items-center gap-3 p-4">
+    <Card className="shrink-0 overflow-hidden">
+      <CardContent className="flex flex-col items-center gap-3 p-4">
         <div className="rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-md">
           {loggedHours}h / {expectedHours}h logged
         </div>
         <div
-          className="relative flex w-full flex-1 items-center justify-center"
+          className="relative flex w-full items-center justify-center"
           role="img"
           aria-label="Llama Avatar"
         >
-          <div className="relative">
+          <div className="relative h-48 w-full">
             {/* Greyscale layer (unfilled) */}
             <img
               src={llamaAvatarSvg}
               alt=""
-              className="block max-h-full w-full opacity-30 grayscale"
+              className="absolute inset-0 block h-full w-full object-contain opacity-30 grayscale"
             />
             {/* Colored layer (filled from bottom) */}
             <img
               src={llamaAvatarSvg}
               alt=""
-              className="absolute inset-0 block max-h-full w-full transition-[clip-path] duration-700 ease-in-out"
+              className="absolute inset-0 block h-full w-full object-contain transition-[clip-path] duration-700 ease-in-out"
               style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
             />
           </div>
@@ -322,15 +326,13 @@ function App() {
         {activeTab === 'llama-time' && (
           <div className="flex flex-1 flex-col gap-4 min-h-0">
             <LlamaTimeToolbar />
-            <div className="grid flex-1 min-h-0 grid-cols-[280px_minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
-              {/* Left sidebar */}
-              <LlamaSidebar />
-
-              {/* Center — chart */}
+            <div className="grid flex-1 min-h-0 grid-cols-[minmax(0,1fr)_280px] grid-rows-[minmax(0,1fr)] gap-4">
+              {/* Left — chart */}
               <LlamaTimeTab />
 
               {/* Right sidebar */}
-              <div className="relative flex flex-col gap-4">
+              <div className="relative flex flex-col gap-4 overflow-y-auto">
+                <LlamaSidebar />
                 <SummaryCard />
                 <ActivityLogCard />
               </div>

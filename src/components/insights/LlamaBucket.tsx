@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Matter from 'matter-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import llamaSvgUrl from '@/assets/73897352_JEMA LUIS 283-03.svg'
+import { getCurrentLlama } from '@/lib/llama-avatar'
 
 const LLAMA_COUNT = 30
 const LLAMA_SIZE = 64
@@ -14,6 +14,7 @@ interface LlamaBody {
 }
 
 export function LlamaBucket() {
+  const llamaSvgUrl = getCurrentLlama()
   const containerRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<Matter.Engine | null>(null)
   const bodiesRef = useRef<Matter.Body[]>([])

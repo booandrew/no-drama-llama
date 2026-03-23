@@ -6,8 +6,6 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PROJECT_COLORS } from './mock-data'
-
 const chartConfig = {
   hours: {
     label: 'Hours',
@@ -18,9 +16,10 @@ const chartConfig = {
 interface Props {
   data: { project: string; hours: number }[]
   periodLabel: string
+  projectColors: Record<string, string>
 }
 
-export function ProjectsBarChart({ data, periodLabel }: Props) {
+export function ProjectsBarChart({ data, periodLabel, projectColors }: Props) {
   return (
     <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
       <CardHeader className="shrink-0 px-4 py-3">
@@ -45,7 +44,7 @@ export function ProjectsBarChart({ data, periodLabel }: Props) {
               {data.map((entry) => (
                 <Cell
                   key={entry.project}
-                  fill={PROJECT_COLORS[entry.project] ?? 'var(--chart-1)'}
+                  fill={projectColors[entry.project] ?? 'var(--chart-1)'}
                 />
               ))}
             </Bar>
