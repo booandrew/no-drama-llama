@@ -36,12 +36,15 @@ export function useGoogleCalendarConnect() {
             })
 
             if (!res.ok) {
-              console.error('[GCal] Token exchange failed:', res.status)
+              const errText = await res.text().catch(() => '')
+              console.error('[GCal] Token exchange failed:', res.status, errText)
               setStatus('error')
               return
             }
 
             setConnected(method)
+            // Trigger an auth status check + health check to confirm cookies were set
+            useCalendarStore.getState().checkHealth()
           } catch (e) {
             console.error('[GCal] Token exchange error:', e)
             setStatus('error')

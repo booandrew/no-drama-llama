@@ -149,11 +149,18 @@ function parseDurationToMin(dur: string): number {
   return n > 0 ? Math.round(n / 60) : 0
 }
 
+const SUMMARY_MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
 function SummaryCard() {
   const [view, setView] = useState<'projects' | 'issues'>('projects')
+  const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const tasks = useTasksStore((s) => s.tasks)
   const worklogs = useTasksStore((s) => s.worklogs)
   const issues = useTasksStore((s) => s.issues)
+  const periodLabel = `${SUMMARY_MONTH_NAMES[selectedPeriod.month]} ${selectedPeriod.year}`
 
   const { projectData, issueData } = useMemo(() => {
     const issueMap = new Map(issues.map((i) => [i.issue_key, i]))
@@ -213,7 +220,10 @@ function SummaryCard() {
     <Card className="flex flex-1 flex-col gap-0 py-0">
       <CardHeader className="shrink-0 px-4 py-3">
         <div className="flex items-center justify-between">
-          <CardTitle>Summary</CardTitle>
+          <div>
+            <CardTitle>Summary</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">{periodLabel}</p>
+          </div>
           <div className="flex rounded-full border p-0.5 text-xs">
             <button
               onClick={() => setView('projects')}

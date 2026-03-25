@@ -139,6 +139,15 @@ function readPersonalClientId(): string {
   }
 }
 
+function readPersonalClientSecret(): string {
+  try {
+    const raw = localStorage.getItem('gcal-personal-secret')
+    return raw ?? ''
+  } catch {
+    return ''
+  }
+}
+
 function GCalTab() {
   const status = useCalendarStore((s) => s.status)
   const authMethod = useCalendarStore((s) => s.authMethod)
@@ -162,6 +171,9 @@ function GCalTab() {
     if (!gisReady) return
     if (method === 'personal') {
       setPersonalClientId(clientId)
+      if (clientSecret) {
+        localStorage.setItem('gcal-personal-secret', clientSecret)
+      }
     }
     connect(clientId, method, clientSecret, forceConsent)
   }
@@ -204,7 +216,9 @@ function GCalTab() {
               onClick={() => {
                 const clientId =
                   authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
-                if (clientId) initAndConnect(clientId, authMethod ?? 'org', undefined, true)
+                const secret =
+                  authMethod === 'personal' ? readPersonalClientSecret() : undefined
+                if (clientId) initAndConnect(clientId, authMethod ?? 'org', secret, true)
               }}
             >
               Re-connect

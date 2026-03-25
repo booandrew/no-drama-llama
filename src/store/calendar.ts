@@ -79,6 +79,11 @@ export const useCalendarStore = create<CalendarState>()(
         } catch {
           // best-effort
         }
+        try {
+          localStorage.removeItem('gcal-personal-secret')
+        } catch {
+          // best-effort
+        }
         set({
           authMethod: null,
           personalClientId: null,

@@ -21,13 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useAggregateConnectionStatus, useAllAuthChecked } from '@/hooks/use-connection-health'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
@@ -36,9 +29,52 @@ import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useTasksStore } from '@/store/tasks'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import { format, startOfWeek, endOfWeek } from 'date-fns'
 import type { ViewMode } from '@/store/app'
+import type { Period } from '@/store/calendar'
 import { toast } from 'sonner'
+
+const MONTH_NAMES_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+const MONTH_NAMES_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+const TYPE_LEGEND: { type: RowType; fullLabel: string }[] = [
+  { type: 'worklog', fullLabel: 'Jira Worklog' },
+  { type: 'custom', fullLabel: 'Manual Input' },
+  { type: 'calendar', fullLabel: 'Google Calendar' },
+]
+
+function getNavigationLabel(viewMode: ViewMode, selectedDate: string, selectedPeriod: Period): string {
+  if (viewMode === 'day') {
+    return format(new Date(selectedDate + 'T12:00:00'), 'EEE, MMM d')
+  }
+  if (viewMode === 'week') {
+    const d = new Date(selectedDate + 'T12:00:00')
+    const mon = startOfWeek(d, { weekStartsOn: 1 })
+    const sun = endOfWeek(d, { weekStartsOn: 1 })
+    if (mon.getMonth() === sun.getMonth()) {
+      return `${format(mon, 'MMM d')} – ${format(sun, 'd, yyyy')}`
+    }
+    return `${format(mon, 'MMM d')} – ${format(sun, 'MMM d, yyyy')}`
+  }
+  // month + list
+  return `${MONTH_NAMES_FULL[selectedPeriod.month]} ${selectedPeriod.year}`
+}
 
 const MINUTES_PER_DAY = 1440
 const WORK_START_HOUR = 7
@@ -146,24 +182,6 @@ interface TaskGroup {
   taskIds: string[]
   readonly: boolean
 }
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
-
-const currentYear = new Date().getFullYear()
-const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
 // ---------------------------------------------------------------------------
 // MiniTimeline — horizontal compressed overview with draggable viewport
@@ -316,15 +334,85 @@ function MiniTimeline({
 }
 
 // ---------------------------------------------------------------------------
-// LlamaTimeToolbar — period selector + action buttons (full-width row)
+// LlamaTimeToolbar — action buttons (full-width row)
 // ---------------------------------------------------------------------------
 export function LlamaTimeToolbar() {
   const isMockMode = useAppStore((s) => s.isMockMode)
+  const viewMode = useAppStore((s) => s.viewMode)
+  const setViewMode = useAppStore((s) => s.setViewMode)
+  const selectedDate = useAppStore((s) => s.selectedDate)
+  const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
   const loadTasks = useTasksStore((s) => s.loadTasks)
   const aggregateStatus = useAggregateConnectionStatus()
   const [syncing, setSyncing] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerYear, setPickerYear] = useState(selectedPeriod.year)
+
+  const navigateDay = (offset: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + offset)
+    setSelectedDate(d.toISOString().slice(0, 10))
+  }
+
+  const navigateWeek = (offset: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + offset * 7)
+    setSelectedDate(d.toISOString().slice(0, 10))
+  }
+
+  const navigateMonth = (offset: number) => {
+    const next = new Date(selectedPeriod.year, selectedPeriod.month + offset, 1)
+    setSelectedPeriod({ year: next.getFullYear(), month: next.getMonth() })
+  }
+
+  const goToToday = () => {
+    const now = new Date()
+    setSelectedDate(now.toISOString().slice(0, 10))
+    setSelectedPeriod({ year: now.getFullYear(), month: now.getMonth() })
+  }
+
+  const handlePrev = () => {
+    if (viewMode === 'day') navigateDay(-1)
+    else if (viewMode === 'week') navigateWeek(-1)
+    else navigateMonth(-1)
+  }
+
+  const handleNext = () => {
+    if (viewMode === 'day') navigateDay(1)
+    else if (viewMode === 'week') navigateWeek(1)
+    else navigateMonth(1)
+  }
+
+  const handlePickMonth = (month: number) => {
+    setSelectedPeriod({ year: pickerYear, month })
+    // Also sync selectedDate so week/day views land inside chosen month
+    const pad = (n: number) => String(n).padStart(2, '0')
+    setSelectedDate(`${pickerYear}-${pad(month + 1)}-01`)
+    setPickerOpen(false)
+  }
+
+  // Sync views when switching between month-based and date-based modes
+  const handleViewModeChange = (mode: ViewMode) => {
+    if (mode === 'week' || mode === 'day') {
+      // If selectedDate is outside selectedPeriod, snap it
+      const d = new Date(selectedDate + 'T12:00:00')
+      if (d.getFullYear() !== selectedPeriod.year || d.getMonth() !== selectedPeriod.month) {
+        const pad = (n: number) => String(n).padStart(2, '0')
+        setSelectedDate(`${selectedPeriod.year}-${pad(selectedPeriod.month + 1)}-01`)
+      }
+    } else if (mode === 'month' || mode === 'list') {
+      // Sync period from selectedDate
+      const d = new Date(selectedDate + 'T12:00:00')
+      if (d.getFullYear() !== selectedPeriod.year || d.getMonth() !== selectedPeriod.month) {
+        setSelectedPeriod({ year: d.getFullYear(), month: d.getMonth() })
+      }
+    }
+    setViewMode(mode)
+  }
+
+  const navigationLabel = getNavigationLabel(viewMode, selectedDate, selectedPeriod)
 
   const handleLoadSources = useCallback(async () => {
     setSyncing(true)
@@ -353,70 +441,97 @@ export function LlamaTimeToolbar() {
   }, [selectedPeriod, loadTasks])
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(selectedPeriod.month)}
-            onValueChange={(v) =>
-              setSelectedPeriod({ year: selectedPeriod.year, month: Number(v) })
-            }
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTH_NAMES.map((name, i) => (
-                <SelectItem key={i} value={String(i)}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={String(selectedPeriod.year)}
-            onValueChange={(v) =>
-              setSelectedPeriod({ year: Number(v), month: selectedPeriod.month })
-            }
-          >
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {/* View mode tabs */}
+        <div className="flex items-center gap-1 rounded-lg border p-0.5">
+          {(['month', 'week', 'day', 'list'] as ViewMode[]).map((mode) => (
+            <Button
+              key={mode}
+              variant={viewMode === mode ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 px-3 text-xs capitalize"
+              onClick={() => handleViewModeChange(mode)}
+            >
+              {mode === 'list' ? 'Task List' : mode}
+            </Button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          {isMockMode ? (
-            <span className="text-muted-foreground text-xs">Mock mode — using synthetic data</span>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={syncing || aggregateStatus === 'none'}
-                onClick={handleLoadSources}
-              >
-                {syncing ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Load Sources
-              </Button>
-              <Button variant="default" size="sm" disabled>
-                I'm good with timelogs, Submit to JIRA
-              </Button>
-            </>
-          )}
+        {/* Navigation — unified for all views */}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-7 px-2" onClick={handlePrev}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Popover open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (open) setPickerYear(selectedPeriod.year) }}>
+            <PopoverTrigger asChild>
+              <button className="min-w-[140px] text-center text-xs font-medium select-none cursor-pointer rounded px-2 py-1 hover:bg-muted transition-colors">
+                {navigationLabel}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[240px] p-3" align="center">
+              <div className="flex items-center justify-between mb-2">
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPickerYear((y) => y - 1)}>
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-sm font-semibold">{pickerYear}</span>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPickerYear((y) => y + 1)}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {MONTH_NAMES_SHORT.map((name, i) => {
+                  const isActive = pickerYear === selectedPeriod.year && i === selectedPeriod.month
+                  return (
+                    <button
+                      key={name}
+                      className={`rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted text-foreground'
+                      }`}
+                      onClick={() => handlePickMonth(i)}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={goToToday}>
+            Today
+          </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {isMockMode ? (
+          <span className="text-muted-foreground text-xs">Mock mode — using synthetic data</span>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              disabled={syncing || aggregateStatus === 'none'}
+              onClick={handleLoadSources}
+            >
+              {syncing ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Load Sources
+            </Button>
+            <Button variant="default" size="sm" className="text-xs" disabled>
+              I'm good with timelogs, Submit to JIRA
+            </Button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -428,11 +543,8 @@ export function LlamaTimeToolbar() {
 export function LlamaTimeTab() {
   const isMockMode = useAppStore((s) => s.isMockMode)
   const viewMode = useAppStore((s) => s.viewMode)
-  const setViewMode = useAppStore((s) => s.setViewMode)
   const selectedDate = useAppStore((s) => s.selectedDate)
-  const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
-  const setSelectedPeriod = useCalendarStore((s) => s.setSelectedPeriod)
   const { isReady } = useDuckDB()
 
   const tasks = useTasksStore((s) => s.tasks)
@@ -455,27 +567,6 @@ export function LlamaTimeTab() {
       setConnectDialogOpen(true)
     }
     setHasAutoOpened(true)
-  }
-
-  const navigateDay = (offset: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + offset)
-    setSelectedDate(d.toISOString().slice(0, 10))
-  }
-
-  const navigateWeek = (offset: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + offset * 7)
-    setSelectedDate(d.toISOString().slice(0, 10))
-  }
-
-  const navigateMonth = (offset: number) => {
-    const next = new Date(selectedPeriod.year, selectedPeriod.month + offset, 1)
-    setSelectedPeriod({ year: next.getFullYear(), month: next.getMonth() })
-  }
-
-  const goToToday = () => {
-    setSelectedDate(new Date().toISOString().slice(0, 10))
   }
 
   // Load all data when period or readiness changes
@@ -700,71 +791,43 @@ export function LlamaTimeTab() {
         <Card className="flex flex-1 min-h-0 flex-col">
           {/* Card header */}
           <div className="shrink-0 border-b px-4 py-3">
-            <span className="leading-none font-semibold">Wool Work</span>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              {/* View mode tabs */}
-              <div className="flex items-center gap-1 rounded-lg border p-0.5">
-                {(['day', 'week', 'month', 'list'] as ViewMode[]).map((mode) => (
-                  <Button
-                    key={mode}
-                    variant={viewMode === mode ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 px-3 text-xs capitalize"
-                    onClick={() => setViewMode(mode)}
-                  >
-                    {mode === 'list' ? 'Task List' : mode}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Context controls on the right */}
-              {viewMode !== 'list' ? (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2"
-                    onClick={() => (viewMode === 'week' ? navigateWeek(-1) : viewMode === 'month' ? navigateMonth(-1) : navigateDay(-1))}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={goToToday}>
-                    Today
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2"
-                    onClick={() => (viewMode === 'week' ? navigateWeek(1) : viewMode === 'month' ? navigateMonth(1) : navigateDay(1))}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="leading-none font-semibold">Wool Work</span>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    {(
-                      [
-                        [1, 'Day'],
-                        [7, 'Week'],
-                        [14, 'Bi-Week'],
-                        [daysInMonth, 'Month'],
-                      ] as [number, string][]
-                    ).map(([days, label], i, arr) => {
-                      const prevMax = i > 0 ? (arr[i - 1][0] as number) : 0
-                      const isActive = visibleDays > prevMax && visibleDays <= days
-                      return (
-                        <Button
-                          key={label}
-                          variant={isActive ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setVisibleDaysClamped(days)}
+                  {TYPE_LEGEND.map(({ type, fullLabel }) => {
+                    const cfg = TYPE_CONFIG[type]
+                    return (
+                      <div key={type} className="flex items-center gap-1">
+                        <span
+                          className={`rounded px-1 py-0.5 text-[9px] font-semibold leading-none ${cfg.className}`}
                         >
-                          {label}
-                        </Button>
-                      )
-                    })}
-                  </div>
+                          {cfg.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{fullLabel}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {/* Task List secondary toolbar — zoom level + mini timeline */}
+              {viewMode === 'list' && (
+                <div className="flex items-center gap-3">
+                  <Select
+                    value={
+                      visibleDays <= 7 ? '7' : visibleDays <= 14 ? '14' : String(daysInMonth)
+                    }
+                    onValueChange={(v) => setVisibleDaysClamped(v === 'month' ? daysInMonth : Number(v))}
+                  >
+                    <SelectTrigger className="h-7 w-[100px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Week</SelectItem>
+                      <SelectItem value="14">Bi-Week</SelectItem>
+                      <SelectItem value={String(daysInMonth)}>Month</SelectItem>
+                    </SelectContent>
+                  </Select>
 
                   <MiniTimeline
                     year={selectedPeriod.year}
@@ -975,7 +1038,7 @@ export function LlamaTimeTab() {
 
       {/* Task detail dialog — opened from calendar views */}
       <Dialog open={!!detailTask} onOpenChange={(open) => !open && setDetailTask(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg pb-8">
           {detailTask && (
             <TaskDetailContent
               task={detailTask}
@@ -1027,21 +1090,21 @@ function TaskDetailContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
+        <DialogTitle className="flex items-center gap-2 leading-snug">
           <span
             className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${cfg.className}`}
           >
             {cfg.label}
           </span>
-          <span className="truncate">{title}</span>
+          <span className="line-clamp-2 break-words">{title}</span>
         </DialogTitle>
       </DialogHeader>
 
-      <div className="flex flex-col gap-3 text-sm">
+      <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
         {date && (
-          <div className="flex items-center justify-between">
+          <>
             <span className="text-muted-foreground">Date</span>
-            <span>
+            <span className="text-right">
               {date.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -1050,21 +1113,19 @@ function TaskDetailContent({
               {', '}
               {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </span>
-          </div>
+          </>
         )}
         {dur && (
-          <div className="flex items-center justify-between">
+          <>
             <span className="text-muted-foreground">Duration</span>
-            <span>{dur}</span>
-          </div>
+            <span className="text-right">{dur}</span>
+          </>
         )}
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Source</span>
-          <span className="capitalize">{task.source.replace('_', ' ')}</span>
-        </div>
+        <span className="text-muted-foreground">Source</span>
+        <span className="capitalize text-right">{task.source.replace('_', ' ')}</span>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-muted-foreground">Issue Key</span>
+        <span className="text-muted-foreground pt-1">Issue Key</span>
+        <div>
           {isReadonly ? (
             <Input
               className="h-8 text-sm"
