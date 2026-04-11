@@ -40,9 +40,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'app-store',
+      version: 2,
       partialize: (state) => ({
         isMockMode: state.isMockMode,
         hasSeenLanding: state.hasSeenLanding,
+        selectedDate: state.selectedDate,
       }),
     },
   ),

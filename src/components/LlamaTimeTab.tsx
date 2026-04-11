@@ -26,7 +26,7 @@ import { useAggregateConnectionStatus, useAllAuthChecked } from '@/hooks/use-con
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
-import { getMonthDateRange } from '@/lib/date-range'
+import { addDays, getMonthDateRange } from '@/lib/date-range'
 import {
   getRowType,
   getSourceLabel,
@@ -61,6 +61,29 @@ const MONTH_NAMES_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+function periodFromDate(dateStr: string): Period {
+  const [year, month] = dateStr.split('-').map(Number)
+  return { year, month: month - 1 }
+}
+
+function setDateMonth(dateStr: string, year: number, month: number): string {
+  const [, , day] = dateStr.split('-').map(Number)
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+
+  return `${year}-${pad2(month + 1)}-${pad2(Math.min(day, daysInMonth))}`
+}
+
+function addMonthsClamped(dateStr: string, months: number): string {
+  const [year, month] = dateStr.split('-').map(Number)
+  const target = new Date(Date.UTC(year, month - 1 + months, 1))
+
+  return setDateMonth(dateStr, target.getUTCFullYear(), target.getUTCMonth())
+}
 
 function getNavigationLabel(viewMode: ViewMode, selectedDate: string, selectedPeriod: Period): string {
   if (viewMode === 'day') {
@@ -327,27 +350,39 @@ export function LlamaTimeToolbar() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerYear, setPickerYear] = useState(selectedPeriod.year)
 
+  const updateSelectedDate = useCallback(
+    (dateStr: string) => {
+      setSelectedDate(dateStr)
+
+      const nextPeriod = periodFromDate(dateStr)
+      if (nextPeriod.year !== selectedPeriod.year || nextPeriod.month !== selectedPeriod.month) {
+        setSelectedPeriod(nextPeriod)
+      }
+    },
+    [selectedPeriod.month, selectedPeriod.year, setSelectedDate, setSelectedPeriod],
+  )
+
+  useEffect(() => {
+    const nextPeriod = periodFromDate(selectedDate)
+    if (nextPeriod.year !== selectedPeriod.year || nextPeriod.month !== selectedPeriod.month) {
+      setSelectedPeriod(nextPeriod)
+    }
+  }, [selectedDate, selectedPeriod.month, selectedPeriod.year, setSelectedPeriod])
+
   const navigateDay = (offset: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + offset)
-    setSelectedDate(d.toISOString().slice(0, 10))
+    updateSelectedDate(addDays(selectedDate, offset))
   }
 
   const navigateWeek = (offset: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + offset * 7)
-    setSelectedDate(d.toISOString().slice(0, 10))
+    updateSelectedDate(addDays(selectedDate, offset * 7))
   }
 
   const navigateMonth = (offset: number) => {
-    const next = new Date(selectedPeriod.year, selectedPeriod.month + offset, 1)
-    setSelectedPeriod({ year: next.getFullYear(), month: next.getMonth() })
+    updateSelectedDate(addMonthsClamped(selectedDate, offset))
   }
 
   const goToToday = () => {
-    const now = new Date()
-    setSelectedDate(now.toISOString().slice(0, 10))
-    setSelectedPeriod({ year: now.getFullYear(), month: now.getMonth() })
+    updateSelectedDate(new Date().toISOString().slice(0, 10))
   }
 
   const handlePrev = () => {
@@ -363,29 +398,11 @@ export function LlamaTimeToolbar() {
   }
 
   const handlePickMonth = (month: number) => {
-    setSelectedPeriod({ year: pickerYear, month })
-    // Also sync selectedDate so week/day views land inside chosen month
-    const pad = (n: number) => String(n).padStart(2, '0')
-    setSelectedDate(`${pickerYear}-${pad(month + 1)}-01`)
+    updateSelectedDate(setDateMonth(selectedDate, pickerYear, month))
     setPickerOpen(false)
   }
 
-  // Sync views when switching between month-based and date-based modes
   const handleViewModeChange = (mode: ViewMode) => {
-    if (mode === 'week' || mode === 'day') {
-      // If selectedDate is outside selectedPeriod, snap it
-      const d = new Date(selectedDate + 'T12:00:00')
-      if (d.getFullYear() !== selectedPeriod.year || d.getMonth() !== selectedPeriod.month) {
-        const pad = (n: number) => String(n).padStart(2, '0')
-        setSelectedDate(`${selectedPeriod.year}-${pad(selectedPeriod.month + 1)}-01`)
-      }
-    } else if (mode === 'month' || mode === 'list') {
-      // Sync period from selectedDate
-      const d = new Date(selectedDate + 'T12:00:00')
-      if (d.getFullYear() !== selectedPeriod.year || d.getMonth() !== selectedPeriod.month) {
-        setSelectedPeriod({ year: d.getFullYear(), month: d.getMonth() })
-      }
-    }
     setViewMode(mode)
   }
 

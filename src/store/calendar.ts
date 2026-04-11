@@ -28,6 +28,30 @@ function currentPeriod(): Period {
   return { year: now.getFullYear(), month: now.getMonth() }
 }
 
+function periodFromDate(dateStr: string): Period {
+  const [year, month] = dateStr.split('-').map(Number)
+  return { year, month: month - 1 }
+}
+
+function readPersistedSelectedDate(): string | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem('app-store')
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as {
+      state?: {
+        selectedDate?: unknown
+      }
+    }
+
+    return typeof parsed.state?.selectedDate === 'string' ? parsed.state.selectedDate : null
+  } catch {
+    return null
+  }
+}
+
 interface CalendarState {
   status: CalendarStatus
   authMethod: CalendarAuthMethod | null
@@ -194,6 +218,23 @@ export const useCalendarStore = create<CalendarState>()(
     }),
     {
       name: 'gcal-storage',
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = (persistedState ?? {}) as Partial<CalendarState>
+        const selectedPeriod =
+          version < 2
+            ? (() => {
+                const selectedDate = readPersistedSelectedDate()
+                return selectedDate ? periodFromDate(selectedDate) : currentPeriod()
+              })()
+            : state.selectedPeriod ?? currentPeriod()
+
+        return {
+          authMethod: state.authMethod ?? null,
+          personalClientId: state.personalClientId ?? null,
+          selectedPeriod,
+        }
+      },
       partialize: (state) => ({
         authMethod: state.authMethod,
         personalClientId: state.personalClientId,
