@@ -25,6 +25,7 @@ import { useAggregateConnectionStatus, useAllAuthChecked } from '@/hooks/use-con
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
+import { getMonthDateRange } from '@/lib/date-range'
 import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
@@ -418,11 +419,8 @@ export function LlamaTimeToolbar() {
     setSyncing(true)
     try {
       const { year, month } = selectedPeriod
-      const dateStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      const lastDay = new Date(year, month + 1, 0).getDate()
-      const dateEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-
-      const result = await syncAll(dateStart, dateEnd)
+      const { start, endExclusive } = getMonthDateRange(year, month)
+      const result = await syncAll(start, endExclusive)
 
       if (result.errors.length > 0) {
         toast.warning('Some sources failed to sync', {

@@ -7,6 +7,7 @@ import type {
   DdsTempoDailyCapacity,
   TaskUpdate,
 } from '@/lib/duckdb/queries'
+import { getMonthDateRange, toUtcIsoDateTimeRange } from '@/lib/date-range'
 import * as mockQueries from '@/lib/duckdb/mock-queries'
 import * as queries from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
@@ -37,16 +38,14 @@ export const useTasksStore = create<TasksState>()((set) => ({
   loadTasks: async (year, month) => {
     set({ loading: true })
     try {
-      const dateStart = new Date(year, month, 1).toISOString()
-      const dateEnd = new Date(year, month + 1, 1).toISOString()
-      const capStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      const capEnd = new Date(year, month + 1, 1).toISOString().slice(0, 10)
+      const monthRange = getMonthDateRange(year, month)
+      const taskRange = toUtcIsoDateTimeRange(monthRange)
       const mod = getQueries()
       const [tasks, worklogs, issues, dailyCapacity] = await Promise.all([
-        mod.readDdsTasks(dateStart, dateEnd),
-        mod.readDdsJiraWorklogs(dateStart, dateEnd),
+        mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
+        mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
         mod.readDdsJiraIssues(),
-        mod.readDdsTempoDailyCapacity(capStart, capEnd),
+        mod.readDdsTempoDailyCapacity(monthRange.start, monthRange.endExclusive),
       ])
       set({ tasks, worklogs, issues, dailyCapacity })
     } finally {

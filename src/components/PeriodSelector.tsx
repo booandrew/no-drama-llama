@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { addDays, addMonths } from '@/lib/date-range'
 import type { PeriodMode } from '@/store/sources'
 import { computePeriod } from '@/store/sources'
 
@@ -34,7 +35,7 @@ function formatPeriodLabel(mode: PeriodMode, selectedDate: string): string {
         customEnd: null,
       })
       const s = new Date(period.start)
-      const e = new Date(period.end)
+      const e = new Date(period.endExclusive)
       e.setDate(e.getDate() - 1)
       return `${s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     }
@@ -43,18 +44,6 @@ function formatPeriodLabel(mode: PeriodMode, selectedDate: string): string {
     default:
       return ''
   }
-}
-
-function addDays(dateStr: string, days: number) {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
-function addMonths(dateStr: string, months: number) {
-  const d = new Date(dateStr)
-  d.setMonth(d.getMonth() + months)
-  return d.toISOString().slice(0, 10)
 }
 
 export interface PeriodSelectorProps {
@@ -148,7 +137,8 @@ export function PeriodSelector({
             value={customStart ?? selectedDate}
             onChange={(e) => {
               const end = customEnd ?? addDays(e.target.value, 30)
-              setCustomRange(e.target.value, end)
+              const err = setCustomRange(e.target.value, end)
+              if (err) alert(err)
             }}
           />
           <span className="text-muted-foreground text-sm">to</span>

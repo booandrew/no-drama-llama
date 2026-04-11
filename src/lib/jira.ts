@@ -1,4 +1,5 @@
 import { useJiraStore } from '@/store/jira'
+import { addDays } from '@/lib/date-range'
 
 function getBase() {
   const { authMethod, cloudId } = useJiraStore.getState()
@@ -42,12 +43,12 @@ export interface JiraWorklog {
 
 export async function fetchWorklogs(
   dateStart: string,
-  dateEnd: string,
+  dateEndExclusive: string,
 ): Promise<{ worklogs: JiraWorklog[]; issues: JiraIssue[] }> {
   // Step 1: JQL to find only issues where current user logged work in the period
   const accountId = getAccountId()
   const jqlStart = dateStart.slice(0, 10) // "YYYY-MM-DD"
-  const jqlEnd = dateEnd.slice(0, 10)
+  const jqlEnd = addDays(dateEndExclusive.slice(0, 10), -1)
   const jql = `worklogDate >= "${jqlStart}" AND worklogDate <= "${jqlEnd}" AND worklogAuthor = currentUser()`
   const maxResults = 200
   const issues: JiraIssue[] = []
@@ -91,7 +92,7 @@ export async function fetchWorklogs(
   for (const issue of issues) {
     const wlParams = new URLSearchParams({
       startedAfter: String(new Date(dateStart).getTime()),
-      startedBefore: String(new Date(dateEnd).getTime()),
+      startedBefore: String(new Date(dateEndExclusive).getTime()),
     })
     const res = await fetch(`${getBase()}/issue/${issue.id}/worklog?${wlParams}`, {
       headers: headers(),

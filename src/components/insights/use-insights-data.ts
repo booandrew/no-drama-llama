@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import * as queries from '@/lib/duckdb/queries'
 import * as mockQueries from '@/lib/duckdb/mock-queries'
+import { getMonthDateRange, toUtcIsoDateTimeRange } from '@/lib/date-range'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
 import { useAppStore } from '@/store/app'
 import { MONTHS } from './mock-data'
@@ -186,9 +187,9 @@ export function useInsightsData(
     if (!isDbReady) return
 
     let cancelled = false
-    setLoading(true)
 
     const load = async () => {
+      if (!cancelled) setLoading(true)
       const mod = queries
       const loadedIssues = await mod.readDdsJiraIssues()
 
@@ -196,11 +197,11 @@ export function useInsightsData(
         // Load all 12 months in parallel
         const results = await Promise.all(
           Array.from({ length: 12 }, (_, m) => {
-            const dateStart = new Date(selectedYear, m, 1).toISOString()
-            const dateEnd = new Date(selectedYear, m + 1, 1).toISOString()
+            const monthRange = getMonthDateRange(selectedYear, m)
+            const taskRange = toUtcIsoDateTimeRange(monthRange)
             return Promise.all([
-              mod.readDdsTasks(dateStart, dateEnd),
-              mod.readDdsJiraWorklogs(dateStart, dateEnd),
+              mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
+              mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
             ])
           }),
         )
@@ -213,11 +214,11 @@ export function useInsightsData(
         setIssues(loadedIssues)
       } else {
         // Load single month
-        const dateStart = new Date(selectedYear, selectedMonth, 1).toISOString()
-        const dateEnd = new Date(selectedYear, selectedMonth + 1, 1).toISOString()
+        const monthRange = getMonthDateRange(selectedYear, selectedMonth)
+        const taskRange = toUtcIsoDateTimeRange(monthRange)
         const [tasks, worklogs] = await Promise.all([
-          mod.readDdsTasks(dateStart, dateEnd),
-          mod.readDdsJiraWorklogs(dateStart, dateEnd),
+          mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
+          mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
         ])
         if (cancelled) return
         const map = new Map<number, MonthData>()
@@ -242,20 +243,20 @@ export function useInsightsData(
     if (!isMockMode) return
 
     let cancelled = false
-    setLoading(true)
 
     const load = async () => {
+      if (!cancelled) setLoading(true)
       const mod = mockQueries
       const loadedIssues = await mod.readDdsJiraIssues()
 
       if (period === 'year') {
         const results = await Promise.all(
           Array.from({ length: 12 }, (_, m) => {
-            const dateStart = new Date(selectedYear, m, 1).toISOString()
-            const dateEnd = new Date(selectedYear, m + 1, 1).toISOString()
+            const monthRange = getMonthDateRange(selectedYear, m)
+            const taskRange = toUtcIsoDateTimeRange(monthRange)
             return Promise.all([
-              mod.readDdsTasks(dateStart, dateEnd),
-              mod.readDdsJiraWorklogs(dateStart, dateEnd),
+              mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
+              mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
             ])
           }),
         )
@@ -267,11 +268,11 @@ export function useInsightsData(
         setMonthDataMap(map)
         setIssues(loadedIssues)
       } else {
-        const dateStart = new Date(selectedYear, selectedMonth, 1).toISOString()
-        const dateEnd = new Date(selectedYear, selectedMonth + 1, 1).toISOString()
+        const monthRange = getMonthDateRange(selectedYear, selectedMonth)
+        const taskRange = toUtcIsoDateTimeRange(monthRange)
         const [tasks, worklogs] = await Promise.all([
-          mod.readDdsTasks(dateStart, dateEnd),
-          mod.readDdsJiraWorklogs(dateStart, dateEnd),
+          mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
+          mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
         ])
         if (cancelled) return
         const map = new Map<number, MonthData>()

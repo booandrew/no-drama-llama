@@ -164,6 +164,10 @@ async function readRows<T>(
   return result.toArray().map((row) => row.toJSON() as T)
 }
 
+function datePrefixRangeWhere(column: string, start: string, endExclusive: string): string {
+  return `SUBSTR(${column}, 1, 10) >= ${escSql(start)} AND SUBSTR(${column}, 1, 10) < ${escSql(endExclusive)}`
+}
+
 // ── Source Layer: Upsert ──────────────────────────────────────────────
 
 export async function upsertSrcJiraIssues(rows: SrcJiraIssue[]) {
@@ -180,6 +184,17 @@ export async function upsertSrcJiraWorklogs(rows: SrcJiraWorklog[]) {
     rows.map((r) => ({ ...r, loaded_at: new Date().toISOString() })),
     'id',
   )
+}
+
+export async function replaceSrcJiraWorklogsInRange(
+  dateStart: string,
+  dateEndExclusive: string,
+  rows: SrcJiraWorklog[],
+) {
+  await exec(
+    `DELETE FROM src_jira_worklogs WHERE ${datePrefixRangeWhere('started', dateStart, dateEndExclusive)}`,
+  )
+  await upsertSrcJiraWorklogs(rows)
 }
 
 export async function upsertSrcCalendarEvents(rows: SrcCalendarEvent[]) {
@@ -227,6 +242,17 @@ export async function upsertDdsJiraIssues(rows: DdsJiraIssue[]) {
 
 export async function upsertDdsJiraWorklogs(rows: DdsJiraWorklog[]) {
   await upsertRows('dds_jira_worklogs', rows as unknown as Record<string, unknown>[], 'worklog_id')
+}
+
+export async function replaceDdsJiraWorklogsInRange(
+  dateStart: string,
+  dateEndExclusive: string,
+  rows: DdsJiraWorklog[],
+) {
+  await exec(
+    `DELETE FROM dds_jira_worklogs WHERE ${datePrefixRangeWhere('started', dateStart, dateEndExclusive)}`,
+  )
+  await upsertDdsJiraWorklogs(rows)
 }
 
 export async function upsertDdsCalendarEvents(rows: DdsCalendarEvent[]) {
@@ -305,6 +331,20 @@ export async function upsertSrcTempoWorkloadDays(rows: SrcTempoWorkloadDay[]) {
   await exec(`INSERT INTO src_tempo_workload_days (${cols.join(', ')}) VALUES ${values}`)
 }
 
+export async function replaceAllSrcTempoWorkloadDays(rows: SrcTempoWorkloadDay[]) {
+  await exec('DELETE FROM src_tempo_workload_days')
+  if (rows.length === 0) return
+
+  const cols = ['scheme_id', 'scheme_name', 'day', 'required_seconds', 'loaded_at']
+  const values = rows
+    .map(
+      (r) =>
+        `(${[r.scheme_id, r.scheme_name, r.day, r.required_seconds, new Date().toISOString()].map(escSql).join(', ')})`,
+    )
+    .join(',\n')
+  await exec(`INSERT INTO src_tempo_workload_days (${cols.join(', ')}) VALUES ${values}`)
+}
+
 export async function upsertSrcTempoHolidays(rows: SrcTempoHoliday[]) {
   if (rows.length === 0) return
   // Composite PK (scheme_id, holiday_id) — delete+insert per scheme
@@ -322,8 +362,50 @@ export async function upsertSrcTempoHolidays(rows: SrcTempoHoliday[]) {
   await exec(`INSERT INTO src_tempo_holidays (${cols.join(', ')}) VALUES ${values}`)
 }
 
+export async function replaceSrcTempoHolidaysInRange(
+  dateStart: string,
+  dateEndExclusive: string,
+  rows: SrcTempoHoliday[],
+) {
+  await exec(
+    `DELETE FROM src_tempo_holidays WHERE date >= ${escSql(dateStart)} AND date < ${escSql(dateEndExclusive)}`,
+  )
+
+  if (rows.length > 0) {
+    const incomingKeyWhere = rows
+      .map(
+        (r) =>
+          `(scheme_id = ${escSql(r.scheme_id)} AND holiday_id = ${escSql(r.holiday_id)})`,
+      )
+      .join(' OR ')
+    await exec(`DELETE FROM src_tempo_holidays WHERE ${incomingKeyWhere}`)
+  }
+
+  if (rows.length === 0) return
+
+  const cols = ['scheme_id', 'holiday_id', 'name', 'date', 'duration_seconds', 'type', 'loaded_at']
+  const values = rows
+    .map(
+      (r) =>
+        `(${[r.scheme_id, r.holiday_id, r.name, r.date, r.duration_seconds, r.type, new Date().toISOString()].map(escSql).join(', ')})`,
+    )
+    .join(',\n')
+  await exec(`INSERT INTO src_tempo_holidays (${cols.join(', ')}) VALUES ${values}`)
+}
+
 export async function upsertDdsTempoDailyCapacity(rows: DdsTempoDailyCapacity[]) {
   if (rows.length === 0) return
+  await upsertRows('dds_tempo_daily_capacity', rows as unknown as Record<string, unknown>[], 'date')
+}
+
+export async function replaceDdsTempoDailyCapacityInRange(
+  dateStart: string,
+  dateEndExclusive: string,
+  rows: DdsTempoDailyCapacity[],
+) {
+  await exec(
+    `DELETE FROM dds_tempo_daily_capacity WHERE date >= ${escSql(dateStart)} AND date < ${escSql(dateEndExclusive)}`,
+  )
   await upsertRows('dds_tempo_daily_capacity', rows as unknown as Record<string, unknown>[], 'date')
 }
 
@@ -335,16 +417,16 @@ export function readSrcTempoWorkloadDays() {
   })
 }
 
-export function readSrcTempoHolidays(dateStart: string, dateEnd: string) {
+export function readSrcTempoHolidays(dateStart: string, dateEndExclusive: string) {
   return readRows<SrcTempoHoliday & { loaded_at: string }>('src_tempo_holidays', {
-    where: `date >= ${escSql(dateStart)} AND date < ${escSql(dateEnd)}`,
+    where: `date >= ${escSql(dateStart)} AND date < ${escSql(dateEndExclusive)}`,
     orderBy: 'date',
   })
 }
 
-export function readDdsTempoDailyCapacity(dateStart: string, dateEnd: string) {
+export function readDdsTempoDailyCapacity(dateStart: string, dateEndExclusive: string) {
   return readRows<DdsTempoDailyCapacity>('dds_tempo_daily_capacity', {
-    where: `date >= ${escSql(dateStart)} AND date < ${escSql(dateEnd)}`,
+    where: `date >= ${escSql(dateStart)} AND date < ${escSql(dateEndExclusive)}`,
     orderBy: 'date',
   })
 }
@@ -375,9 +457,9 @@ export function readSrcJiraIssues() {
   })
 }
 
-export function readSrcJiraWorklogs(dateStart: string, dateEnd: string) {
+export function readSrcJiraWorklogs(dateStart: string, dateEndExclusive: string) {
   return readRows<SrcJiraWorklog & { loaded_at: string }>('src_jira_worklogs', {
-    where: `started >= ${escSql(dateStart)} AND started < ${escSql(dateEnd)}`,
+    where: datePrefixRangeWhere('started', dateStart, dateEndExclusive),
     orderBy: 'started',
   })
 }
@@ -395,9 +477,9 @@ export function readDdsJiraIssues() {
   })
 }
 
-export function readDdsJiraWorklogs(dateStart: string, dateEnd: string) {
+export function readDdsJiraWorklogs(dateStart: string, dateEndExclusive: string) {
   return readRows<DdsJiraWorklog>('dds_jira_worklogs', {
-    where: `started >= ${escSql(dateStart)} AND started < ${escSql(dateEnd)}`,
+    where: datePrefixRangeWhere('started', dateStart, dateEndExclusive),
     orderBy: 'started',
   })
 }

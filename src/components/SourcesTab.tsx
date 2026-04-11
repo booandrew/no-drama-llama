@@ -145,7 +145,7 @@ export function SourcesTab() {
     const q = isMockMode ? mockQueries : realQueries
 
     try {
-      const { start, end } = getPeriod()
+      const { start, endExclusive } = getPeriod()
       let rows: Record<string, unknown>[] = []
 
       if (activeSubtab === 'jira-issues') {
@@ -154,23 +154,32 @@ export function SourcesTab() {
           : await q.readDdsJiraIssues()) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'jira-worklogs') {
         rows = (activeView === 'raw'
-          ? await q.readSrcJiraWorklogs(start, end)
-          : await q.readDdsJiraWorklogs(start, end)) as unknown as Record<string, unknown>[]
+          ? await q.readSrcJiraWorklogs(start, endExclusive)
+          : await q.readDdsJiraWorklogs(start, endExclusive)) as unknown as Record<
+          string,
+          unknown
+        >[]
       } else if (activeSubtab === 'tempo-capacity') {
         if (tempoView === 'workload-days') {
           rows = (await q.readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
         } else if (tempoView === 'holidays') {
-          rows = (await q.readSrcTempoHolidays(start, end)) as unknown as Record<string, unknown>[]
+          rows = (await q.readSrcTempoHolidays(start, endExclusive)) as unknown as Record<
+            string,
+            unknown
+          >[]
         } else {
-          rows = (await q.readDdsTempoDailyCapacity(start, end)) as unknown as Record<
+          rows = (await q.readDdsTempoDailyCapacity(start, endExclusive)) as unknown as Record<
             string,
             unknown
           >[]
         }
       } else {
         rows = (activeView === 'raw'
-          ? await q.readSrcCalendarEvents(start, end)
-          : await q.readDdsCalendarEvents(start, end)) as unknown as Record<string, unknown>[]
+          ? await q.readSrcCalendarEvents(start, endExclusive)
+          : await q.readDdsCalendarEvents(start, endExclusive)) as unknown as Record<
+          string,
+          unknown
+        >[]
       }
 
       setTableData(rows)
@@ -199,16 +208,16 @@ export function SourcesTab() {
 
     try {
       await initializeDuckDB()
-      const { start, end } = getPeriod()
+      const { start, endExclusive } = getPeriod()
 
       if (activeSubtab === 'jira-issues') {
         await syncJiraIssues()
       } else if (activeSubtab === 'jira-worklogs') {
-        await syncJiraWorklogs(start, end)
+        await syncJiraWorklogs(start, endExclusive)
       } else if (activeSubtab === 'tempo-capacity') {
-        await syncTempoCapacity(start, end)
+        await syncTempoCapacity(start, endExclusive)
       } else {
-        await syncCalendarEvents(start, end)
+        await syncCalendarEvents(start, endExclusive)
       }
 
       await loadData()

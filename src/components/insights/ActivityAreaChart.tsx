@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import {
   ChartContainer,
@@ -20,22 +20,20 @@ const allChartConfig: ChartConfig = {
 }
 
 export function ActivityAreaChart({ data, periodLabel, xAxisLabel, projects, projectColors }: Props) {
-  const [mode, setMode] = useState<'all' | 'projects'>('all')
-  const [activeProjects, setActiveProjects] = useState<Set<string>>(new Set(projects))
-
-  useEffect(() => {
-    setMode('all')
-    setActiveProjects(new Set(projects))
-  }, [projects])
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set(projects))
+  const activeProjects = useMemo(() => {
+    const next = new Set(projects.filter((project) => selectedProjects.has(project)))
+    return next.size === 0 ? new Set(projects) : next
+  }, [projects, selectedProjects])
+  const mode: 'all' | 'projects' = activeProjects.size === projects.length ? 'all' : 'projects'
 
   const toggleProject = (project: string) => {
     if (mode === 'all') {
-      setMode('projects')
-      setActiveProjects(new Set([project]))
+      setSelectedProjects(new Set([project]))
       return
     }
-    setActiveProjects((prev) => {
-      const next = new Set(prev)
+    setSelectedProjects(() => {
+      const next = new Set(activeProjects)
       if (next.has(project)) {
         if (next.size > 1) {
           next.delete(project)
@@ -48,8 +46,7 @@ export function ActivityAreaChart({ data, periodLabel, xAxisLabel, projects, pro
   }
 
   const selectAll = () => {
-    setMode('all')
-    setActiveProjects(new Set(projects))
+    setSelectedProjects(new Set(projects))
   }
 
   const projectChartConfig = useMemo(

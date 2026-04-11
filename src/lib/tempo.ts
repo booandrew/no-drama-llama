@@ -1,4 +1,5 @@
 import { useTempoStore } from '@/store/tempo'
+import { addDays } from '@/lib/date-range'
 
 function headers() {
   return {
@@ -59,7 +60,7 @@ function handleAuth(res: Response) {
 
 export async function fetchUserSchedule(
   dateStart: string,
-  dateEnd: string,
+  dateEndExclusive: string,
 ): Promise<{
   workload: TempoWorkloadScheme[]
   holidays: TempoHolidayScheme[]
@@ -67,7 +68,7 @@ export async function fetchUserSchedule(
 }> {
   const params = new URLSearchParams({
     from: dateStart.slice(0, 10),
-    to: dateEnd.slice(0, 10),
+    to: addDays(dateEndExclusive.slice(0, 10), -1),
   })
   const res = await fetch(`/tempo-api/4/user-schedule?${params}`, {
     headers: headers(),
@@ -140,7 +141,7 @@ export interface TempoWorklogs {
 export async function fetchTempoWorklogs(
   accountId: string,
   dateStart: string,
-  dateEnd: string,
+  dateEndExclusive: string,
 ): Promise<TempoWorklogs> {
   const limit = 1000
   let offset = 0
@@ -149,7 +150,7 @@ export async function fetchTempoWorklogs(
   while (true) {
     const params = new URLSearchParams({
       from: dateStart.slice(0, 10),
-      to: dateEnd.slice(0, 10),
+      to: addDays(dateEndExclusive.slice(0, 10), -1),
       limit: String(limit),
       offset: String(offset),
     })

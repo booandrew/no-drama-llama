@@ -1,14 +1,14 @@
 import { logAction, updateLogEntry } from '@/store/activity-log'
 import {
   upsertSrcJiraIssues,
-  upsertSrcJiraWorklogs,
+  replaceSrcJiraWorklogsInRange,
   upsertSrcCalendarEvents,
-  upsertSrcTempoWorkloadDays,
-  upsertSrcTempoHolidays,
+  replaceAllSrcTempoWorkloadDays,
+  replaceSrcTempoHolidaysInRange,
   upsertDdsJiraIssues,
-  upsertDdsJiraWorklogs,
+  replaceDdsJiraWorklogsInRange,
   upsertDdsCalendarEvents,
-  upsertDdsTempoDailyCapacity,
+  replaceDdsTempoDailyCapacityInRange,
   upsertTasksWithMappings,
   nextTaskRevision,
   cascadeJiraIssueAttributes,
@@ -23,6 +23,7 @@ import type {
 } from '@/lib/duckdb/queries'
 import { fetchIssues, fetchIssuesByIds, fetchWorklogs } from '@/lib/jira'
 import { fetchTempoWorklogs, fetchUserSchedule } from '@/lib/tempo'
+import { addDays } from '@/lib/date-range'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
@@ -112,7 +113,7 @@ export async function syncJiraIssues() {
 
 // ── Sync: Jira Worklogs ──────────────────────────────────────────────
 
-export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
+export async function syncJiraWorklogs(dateStart: string, dateEndExclusive: string) {
   const tempoStatus = useTempoStore.getState().status
   const accountId = useJiraStore.getState().accountId
 
@@ -121,18 +122,18 @@ export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
 
   if (tempoStatus === 'connected' && accountId) {
     // Tempo connected — fetch worklogs from Tempo API, then resolve issues from Jira
-    const tempo = await fetchTempoWorklogs(accountId, dateStart, dateEnd)
+    const tempo = await fetchTempoWorklogs(accountId, dateStart, dateEndExclusive)
     worklogs = tempo.worklogs
     issues = await fetchIssuesByIds(tempo.issueIds)
   } else {
     // Tempo not connected — use Jira-native worklog flow
-    const result = await fetchWorklogs(dateStart, dateEnd)
+    const result = await fetchWorklogs(dateStart, dateEndExclusive)
     worklogs = result.worklogs
     issues = result.issues
   }
 
-  // Upsert raw source
-  await upsertSrcJiraWorklogs(worklogs)
+  // Replace raw source within the synced window
+  await replaceSrcJiraWorklogsInRange(dateStart, dateEndExclusive, worklogs)
 
   // Backfill issues found via worklog search into DDS
   if (issues.length > 0) {
@@ -159,7 +160,7 @@ export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
   // Build issue lookup for keys
   const issueMap = new Map(issues.map((i) => [i.id, i]))
 
-  // Upsert DDS
+  // Replace DDS rows within the synced window
   const ddsWorklogs: DdsJiraWorklog[] = worklogs.map((w) => {
     const issue = issueMap.get(w.issueId)
     return {
@@ -172,19 +173,19 @@ export async function syncJiraWorklogs(dateStart: string, dateEnd: string) {
       link: issue ? `https://jira.atlassian.com/browse/${issue.key}` : null,
     }
   })
-  await upsertDdsJiraWorklogs(ddsWorklogs)
+  await replaceDdsJiraWorklogsInRange(dateStart, dateEndExclusive, ddsWorklogs)
 }
 
 // ── Sync: Google Calendar Events ─────────────────────────────────────
 
-export async function syncCalendarEvents(dateStart: string, dateEnd: string) {
+export async function syncCalendarEvents(dateStart: string, dateEndExclusive: string) {
   const { status, setExpired } = useCalendarStore.getState()
   if (status !== 'connected' && status !== 'done' && status !== 'loading') {
     setExpired()
     throw new Error('Google Calendar not connected')
   }
 
-  const rawEvents = await fetchCalendarEvents(dateStart, dateEnd)
+  const rawEvents = await fetchCalendarEvents(dateStart, dateEndExclusive)
 
   // Upsert raw source
   await upsertSrcCalendarEvents(
@@ -233,7 +234,7 @@ export async function syncCalendarEvents(dateStart: string, dateEnd: string) {
 
 // ── Sync: Tempo Capacity ─────────────────────────────────────────────
 
-export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
+export async function syncTempoCapacity(dateStart: string, dateEndExclusive: string) {
   const { status } = useTempoStore.getState()
   if (status !== 'connected') {
     throw new Error('Tempo not connected')
@@ -244,7 +245,7 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
   let holidaySchemes: import('@/lib/tempo').TempoHolidayScheme[] = []
   let dailySchedule: import('@/lib/tempo').DaySchedule[] = []
   try {
-    const schedule = await fetchUserSchedule(dateStart, dateEnd)
+    const schedule = await fetchUserSchedule(dateStart, dateEndExclusive)
     workloadSchemes = schedule.workload
     holidaySchemes = schedule.holidays
     dailySchedule = schedule.dailySchedule
@@ -266,7 +267,7 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
       required_seconds: d.requiredSeconds,
     })),
   )
-  await upsertSrcTempoWorkloadDays(srcWorkloadDays)
+  await replaceAllSrcTempoWorkloadDays(srcWorkloadDays)
 
   const srcHolidays: SrcTempoHoliday[] = holidaySchemes.flatMap((s) =>
     s.holidays.map((h) => ({
@@ -278,7 +279,7 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
       type: h.type,
     })),
   )
-  await upsertSrcTempoHolidays(srcHolidays)
+  await replaceSrcTempoHolidaysInRange(dateStart, dateEndExclusive, srcHolidays)
 
   // Build DDS: use per-day data from Tempo API directly (includes holidays)
   let dailyCapacity: DdsTempoDailyCapacity[]
@@ -299,24 +300,19 @@ export async function syncTempoCapacity(dateStart: string, dateEnd: string) {
       }
     }
     dailyCapacity = []
-    const current = new Date(dateStart)
-    const endDate = new Date(dateEnd)
-    endDate.setDate(endDate.getDate() + 1)
-    while (current <= endDate) {
-      const dateStr = current.toISOString().slice(0, 10)
-      const dow = current.getDay()
+    for (let date = dateStart; date < dateEndExclusive; date = addDays(date, 1)) {
+      const dow = new Date(date).getDay()
       dailyCapacity.push({
-        date: dateStr,
+        date,
         day_of_week: dow,
         required_seconds: dayMap.get(dow) ?? 0,
         is_holiday: false,
         holiday_name: null,
       })
-      current.setDate(current.getDate() + 1)
     }
   }
 
-  await upsertDdsTempoDailyCapacity(dailyCapacity)
+  await replaceDdsTempoDailyCapacityInRange(dateStart, dateEndExclusive, dailyCapacity)
 }
 
 // ── Sync All ──────────────────────────────────────────────────────────
@@ -329,7 +325,7 @@ export interface SyncAllResult {
   errors: string[]
 }
 
-export async function syncAll(dateStart: string, dateEnd: string): Promise<SyncAllResult> {
+export async function syncAll(dateStart: string, dateEndExclusive: string): Promise<SyncAllResult> {
   const logId = logAction('sync', 'pending', 'Syncing all sources...')
   const result: SyncAllResult = {
     jiraIssues: false,
@@ -349,9 +345,9 @@ export async function syncAll(dateStart: string, dateEnd: string): Promise<SyncA
 
   // Run worklogs, calendar, and tempo in parallel
   const [wl, cal, tempo] = await Promise.allSettled([
-    syncJiraWorklogs(dateStart, dateEnd),
-    syncCalendarEvents(dateStart, dateEnd),
-    syncTempoCapacity(dateStart, dateEnd),
+    syncJiraWorklogs(dateStart, dateEndExclusive),
+    syncCalendarEvents(dateStart, dateEndExclusive),
+    syncTempoCapacity(dateStart, dateEndExclusive),
   ])
 
   if (wl.status === 'fulfilled') result.jiraWorklogs = true

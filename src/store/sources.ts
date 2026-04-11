@@ -1,65 +1,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import {
+  computePeriodRange,
+  daysBetweenInclusive,
+  todayDate,
+} from '@/lib/date-range'
+
 export type PeriodMode = 'day' | 'week' | 'month' | 'custom'
 export type SourceSubtab = 'jira-issues' | 'jira-worklogs' | 'gcal-events' | 'tempo-capacity'
 export type SourceView = 'data' | 'raw'
 
 const MAX_CUSTOM_DAYS = 92 // ~3 months
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getMonday(dateStr: string) {
-  const d = new Date(dateStr)
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  return d.toISOString().slice(0, 10)
-}
-
-function addDays(dateStr: string, days: number) {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
-function getMonthStart(dateStr: string) {
-  const d = new Date(dateStr)
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
-}
-
-function getMonthEnd(dateStr: string) {
-  const d = new Date(dateStr)
-  return new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().slice(0, 10)
-}
-
-function daysBetween(a: string, b: string) {
-  return Math.abs((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24))
-}
-
 export function computePeriod(state: {
   periodMode: PeriodMode
   selectedDate: string
   customStart: string | null
   customEnd: string | null
-}): { start: string; end: string } {
-  switch (state.periodMode) {
-    case 'day':
-      return { start: state.selectedDate, end: addDays(state.selectedDate, 1) }
-    case 'week': {
-      const mon = getMonday(state.selectedDate)
-      return { start: mon, end: addDays(mon, 7) }
-    }
-    case 'month':
-      return { start: getMonthStart(state.selectedDate), end: getMonthEnd(state.selectedDate) }
-    case 'custom':
-      return {
-        start: state.customStart ?? state.selectedDate,
-        end: state.customEnd ?? addDays(state.selectedDate, 1),
-      }
-  }
+}): { start: string; endExclusive: string } {
+  return computePeriodRange(state)
 }
 
 interface SourcesState {
@@ -77,14 +37,14 @@ interface SourcesState {
   setActiveSubtab: (tab: SourceSubtab) => void
   setActiveView: (view: SourceView) => void
   setSyncing: (source: string, loading: boolean) => void
-  getPeriod: () => { start: string; end: string }
+  getPeriod: () => { start: string; endExclusive: string }
 }
 
 export const useSourcesStore = create<SourcesState>()(
   persist(
     (set, get) => ({
       periodMode: 'month',
-      selectedDate: todayISO(),
+      selectedDate: todayDate(),
       customStart: null,
       customEnd: null,
       activeSubtab: 'jira-issues',
@@ -95,11 +55,11 @@ export const useSourcesStore = create<SourcesState>()(
       setSelectedDate: (selectedDate) => set({ selectedDate }),
 
       setCustomRange: (start, end) => {
-        if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
+        if (daysBetweenInclusive(start, end) > MAX_CUSTOM_DAYS) {
           return 'Custom period cannot exceed 3 months'
         }
-        if (new Date(end) <= new Date(start)) {
-          return 'End date must be after start date'
+        if (new Date(end) < new Date(start)) {
+          return 'End date must be on or after start date'
         }
         set({ customStart: start, customEnd: end })
         return null

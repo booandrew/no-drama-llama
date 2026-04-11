@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import {
+  computePeriodRange,
+  daysBetweenInclusive,
+  todayDate,
+} from '@/lib/date-range'
 import type { DdsCustomInput } from '@/lib/duckdb/queries'
 import { logAction } from '@/store/activity-log'
 import {
@@ -11,17 +16,8 @@ import {
   customInputToTask,
 } from '@/lib/duckdb/queries'
 import type { PeriodMode } from '@/store/sources'
-import { computePeriod } from '@/store/sources'
 
 const MAX_CUSTOM_DAYS = 92
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function daysBetween(a: string, b: string) {
-  return Math.abs((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24))
-}
 
 interface CustomInputsState {
   periodMode: PeriodMode
@@ -35,7 +31,7 @@ interface CustomInputsState {
   setPeriodMode: (mode: PeriodMode) => void
   setSelectedDate: (date: string) => void
   setCustomRange: (start: string, end: string) => string | null
-  getPeriod: () => { start: string; end: string }
+  getPeriod: () => { start: string; endExclusive: string }
 
   loadItems: () => Promise<void>
   addItem: (
@@ -61,7 +57,7 @@ export const useCustomInputsStore = create<CustomInputsState>()(
   persist(
     (set, get) => ({
       periodMode: 'day',
-      selectedDate: todayISO(),
+      selectedDate: todayDate(),
       customStart: null,
       customEnd: null,
 
@@ -72,23 +68,23 @@ export const useCustomInputsStore = create<CustomInputsState>()(
       setSelectedDate: (selectedDate) => set({ selectedDate }),
 
       setCustomRange: (start, end) => {
-        if (daysBetween(start, end) > MAX_CUSTOM_DAYS) {
+        if (daysBetweenInclusive(start, end) > MAX_CUSTOM_DAYS) {
           return 'Custom period cannot exceed 3 months'
         }
-        if (new Date(end) <= new Date(start)) {
-          return 'End date must be after start date'
+        if (new Date(end) < new Date(start)) {
+          return 'End date must be on or after start date'
         }
         set({ customStart: start, customEnd: end })
         return null
       },
 
-      getPeriod: () => computePeriod(get()),
+      getPeriod: () => computePeriodRange(get()),
 
       loadItems: async () => {
         set({ loading: true })
         try {
-          const { start, end } = get().getPeriod()
-          const items = await readDdsCustomInputs(start, end)
+          const { start, endExclusive } = get().getPeriod()
+          const items = await readDdsCustomInputs(start, endExclusive)
           set({ items })
         } finally {
           set({ loading: false })
