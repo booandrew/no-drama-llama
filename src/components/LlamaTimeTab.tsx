@@ -4,6 +4,7 @@ import { DayCalendarView } from '@/components/calendar-views/DayCalendarView'
 import { MonthCalendarView } from '@/components/calendar-views/MonthCalendarView'
 import { WeekCalendarView } from '@/components/calendar-views/WeekCalendarView'
 import { ManageConnectionsDialog } from '@/components/ManageConnectionsDialog'
+import { SourceBadge } from '@/components/source-badge'
 import { TimelineChart } from '@/components/TimelineChart'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -26,6 +27,13 @@ import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
 import { getMonthDateRange } from '@/lib/date-range'
+import {
+  getRowType,
+  getSourceLabel,
+  type RowType,
+  SOURCE_TYPE_CONFIG,
+  SOURCE_TYPE_LEGEND,
+} from '@/lib/source-meta'
 import { syncAll } from '@/lib/sync'
 import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
@@ -54,12 +62,6 @@ const MONTH_NAMES_SHORT = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-const TYPE_LEGEND: { type: RowType; fullLabel: string }[] = [
-  { type: 'worklog', fullLabel: 'Jira Worklog' },
-  { type: 'custom', fullLabel: 'Manual Input' },
-  { type: 'calendar', fullLabel: 'Google Calendar' },
-]
-
 function getNavigationLabel(viewMode: ViewMode, selectedDate: string, selectedPeriod: Period): string {
   if (viewMode === 'day') {
     return format(new Date(selectedDate + 'T12:00:00'), 'EEE, MMM d')
@@ -82,33 +84,7 @@ const WORK_START_HOUR = 7
 const WORK_END_HOUR = 20
 const WORK_MINUTES_PER_DAY = (WORK_END_HOUR - WORK_START_HOUR) * 60
 
-type RowType = 'worklog' | 'custom' | 'calendar'
-
 const TYPE_ORDER: RowType[] = ['worklog', 'custom', 'calendar']
-
-const TYPE_CONFIG: Record<RowType, { label: string; barColor: string; className: string }> = {
-  worklog: {
-    label: 'WL',
-    barColor: '#22c55e',
-    className: 'bg-green-500/20 text-green-700 dark:text-green-400',
-  },
-  custom: {
-    label: 'CI',
-    barColor: '#f97316',
-    className: 'bg-orange-500/20 text-orange-700 dark:text-orange-400',
-  },
-  calendar: {
-    label: 'Cal',
-    barColor: '#3b82f6',
-    className: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
-  },
-}
-
-function getRowType(source: string): RowType {
-  if (source === 'jira_worklog') return 'worklog'
-  if (source === 'custom_input') return 'custom'
-  return 'calendar'
-}
 
 function parseDuration(dur: string): number {
   const hMatch = dur.match(/(\d+)h/)
@@ -622,7 +598,7 @@ export function LlamaTimeTab() {
       return a.desc.localeCompare(b.desc)
     })
 
-    const colors = groups.map((g) => TYPE_CONFIG[g.type].barColor)
+    const colors = groups.map((g) => SOURCE_TYPE_CONFIG[g.type].barColor)
     return { allTasks, taskGroups: groups, barColors: colors }
   }, [tasks, worklogs, issues])
 
@@ -793,15 +769,10 @@ export function LlamaTimeTab() {
               <div className="flex items-center gap-4">
                 <span className="leading-none font-semibold">Wool Work</span>
                 <div className="flex items-center gap-3">
-                  {TYPE_LEGEND.map(({ type, fullLabel }) => {
-                    const cfg = TYPE_CONFIG[type]
+                  {SOURCE_TYPE_LEGEND.map(({ type, fullLabel }) => {
                     return (
                       <div key={type} className="flex items-center gap-1">
-                        <span
-                          className={`rounded px-1 py-0.5 text-[9px] font-semibold leading-none ${cfg.className}`}
-                        >
-                          {cfg.label}
-                        </span>
+                        <SourceBadge type={type} className="h-4 px-1" iconClassName="size-3" />
                         <span className="text-[10px] text-muted-foreground">{fullLabel}</span>
                       </div>
                     )
@@ -908,19 +879,17 @@ export function LlamaTimeTab() {
                     <div style={{ height: 10, flexShrink: 0 }} />
                     <div className="flex flex-1 flex-col" style={{ paddingBottom: 10 }}>
                       {taskGroups.map((group) => {
-                        const cfg = TYPE_CONFIG[group.type]
                         return (
                           <div
                             key={group.key}
                             className="flex flex-1 items-center gap-1.5 pl-2 pr-2"
                             title={group.desc}
                           >
-                            <span
-                              className={`shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold leading-none ${cfg.className}`}
+                            <SourceBadge
+                              type={group.type}
+                              className="shrink-0"
                               style={{ width: typeColWidth }}
-                            >
-                              {cfg.label}
-                            </span>
+                            />
                             <span className="min-w-0 flex-1 text-sm text-muted-foreground truncate">
                               {group.desc}
                             </span>
@@ -1079,7 +1048,6 @@ function TaskDetailContent({
   onIssueChange: (issueKey: string | null) => void
 }) {
   const type = getRowType(task.source)
-  const cfg = TYPE_CONFIG[type]
   const isReadonly = type === 'worklog'
   const title = task.description ?? '(no title)'
   const date = task.start_time ? new Date(task.start_time) : null
@@ -1089,11 +1057,7 @@ function TaskDetailContent({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2 leading-snug">
-          <span
-            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${cfg.className}`}
-          >
-            {cfg.label}
-          </span>
+          <SourceBadge type={type} className="shrink-0" />
           <span className="line-clamp-2 break-words">{title}</span>
         </DialogTitle>
       </DialogHeader>
@@ -1120,7 +1084,10 @@ function TaskDetailContent({
           </>
         )}
         <span className="text-muted-foreground">Source</span>
-        <span className="capitalize text-right">{task.source.replace('_', ' ')}</span>
+        <span className="flex items-center justify-end gap-2 text-right">
+          <SourceBadge type={type} className="shrink-0" />
+          <span>{getSourceLabel(task.source)}</span>
+        </span>
 
         <span className="text-muted-foreground pt-1">Issue Key</span>
         <div>
