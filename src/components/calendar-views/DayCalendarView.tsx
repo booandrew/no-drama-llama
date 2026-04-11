@@ -8,8 +8,18 @@ const WORK_START = 7
 const WORK_END = 20
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 function parseDuration(dur: string): number {
@@ -92,11 +102,7 @@ interface DayCalendarViewProps {
   onTaskClick: (task: DdsTask) => void
 }
 
-export function DayCalendarView({
-  selectedDate,
-  tasks,
-  onTaskClick,
-}: DayCalendarViewProps) {
+export function DayCalendarView({ selectedDate, tasks, onTaskClick }: DayCalendarViewProps) {
   const date = useMemo(() => new Date(selectedDate), [selectedDate])
   const dateStr = selectedDate
 
@@ -128,9 +134,7 @@ export function DayCalendarView({
         <div className={`text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
           {date.getDate()}. {MONTH_NAMES[date.getMonth()]} {date.getFullYear()}
         </div>
-        <div className="text-sm text-muted-foreground">
-          {DAY_NAMES[date.getDay()]}
-        </div>
+        <div className="text-sm text-muted-foreground">{DAY_NAMES[date.getDay()]}</div>
       </div>
 
       {/* All-day section */}
@@ -153,11 +157,7 @@ export function DayCalendarView({
         <div className="relative flex-1">
           {/* Hour grid lines */}
           {Array.from({ length: totalHours }, (_, h) => (
-            <div
-              key={h}
-              className="border-b border-border/40"
-              style={{ height: HOUR_HEIGHT }}
-            />
+            <div key={h} className="border-b border-border/40" style={{ height: HOUR_HEIGHT }} />
           ))}
           {/* Events */}
           {positioned.map((ev) => (

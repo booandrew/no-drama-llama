@@ -16,12 +16,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAggregateConnectionStatus, useAllAuthChecked } from '@/hooks/use-connection-health'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 import { Input } from '@/components/ui/input'
@@ -53,13 +48,33 @@ import type { Period } from '@/store/calendar'
 import { toast } from 'sonner'
 
 const MONTH_NAMES_FULL = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 const MONTH_NAMES_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ]
 
 function pad2(n: number): string {
@@ -85,7 +100,11 @@ function addMonthsClamped(dateStr: string, months: number): string {
   return setDateMonth(dateStr, target.getUTCFullYear(), target.getUTCMonth())
 }
 
-function getNavigationLabel(viewMode: ViewMode, selectedDate: string, selectedPeriod: Period): string {
+function getNavigationLabel(
+  viewMode: ViewMode,
+  selectedDate: string,
+  selectedPeriod: Period,
+): string {
   if (viewMode === 'day') {
     return format(new Date(selectedDate + 'T12:00:00'), 'EEE, MMM d')
   }
@@ -454,7 +473,13 @@ export function LlamaTimeToolbar() {
           <Button variant="outline" size="sm" className="h-7 px-2" onClick={handlePrev}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Popover open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (open) setPickerYear(selectedPeriod.year) }}>
+          <Popover
+            open={pickerOpen}
+            onOpenChange={(open) => {
+              setPickerOpen(open)
+              if (open) setPickerYear(selectedPeriod.year)
+            }}
+          >
             <PopoverTrigger asChild>
               <button className="min-w-[140px] text-center text-xs font-medium select-none cursor-pointer rounded px-2 py-1 hover:bg-muted transition-colors">
                 {navigationLabel}
@@ -462,11 +487,21 @@ export function LlamaTimeToolbar() {
             </PopoverTrigger>
             <PopoverContent className="w-[240px] p-3" align="center">
               <div className="flex items-center justify-between mb-2">
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPickerYear((y) => y - 1)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setPickerYear((y) => y - 1)}
+                >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
                 <span className="text-sm font-semibold">{pickerYear}</span>
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPickerYear((y) => y + 1)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setPickerYear((y) => y + 1)}
+                >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -800,10 +835,10 @@ export function LlamaTimeTab() {
               {viewMode === 'list' && (
                 <div className="flex items-center gap-3">
                   <Select
-                    value={
-                      visibleDays <= 7 ? '7' : visibleDays <= 14 ? '14' : String(daysInMonth)
+                    value={visibleDays <= 7 ? '7' : visibleDays <= 14 ? '14' : String(daysInMonth)}
+                    onValueChange={(v) =>
+                      setVisibleDaysClamped(v === 'month' ? daysInMonth : Number(v))
                     }
-                    onValueChange={(v) => setVisibleDaysClamped(v === 'month' ? daysInMonth : Number(v))}
                   >
                     <SelectTrigger className="h-7 w-[100px] text-xs">
                       <SelectValue />
@@ -830,7 +865,6 @@ export function LlamaTimeTab() {
 
           {viewMode === 'list' && (
             <>
-
               {/* Day labels header — fixed, syncs horizontal scroll */}
               <div className="flex shrink-0 border-b">
                 <div
@@ -962,7 +996,11 @@ export function LlamaTimeTab() {
                 </div>
 
                 {/* Chart body — main scroll container */}
-                <div ref={chartBodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
+                <div
+                  ref={chartBodyRef}
+                  className="flex-1 overflow-auto"
+                  onScroll={handleBodyScroll}
+                >
                   <div
                     style={{
                       minWidth: `${chartWidthPercent}%`,
@@ -1109,11 +1147,7 @@ function TaskDetailContent({
         <span className="text-muted-foreground pt-1">Issue Key</span>
         <div>
           {isReadonly ? (
-            <Input
-              className="h-8 text-sm"
-              value={task.issue_key ?? ''}
-              disabled
-            />
+            <Input className="h-8 text-sm" value={task.issue_key ?? ''} disabled />
           ) : (
             <Combobox
               value={task.issue_key}
@@ -1132,15 +1166,9 @@ function TaskDetailContent({
                   {(issueKey: string) => {
                     const issue = issues.find((i) => i.issue_key === issueKey)
                     return (
-                      <ComboboxItem
-                        key={issueKey}
-                        value={issueKey}
-                        className="whitespace-nowrap"
-                      >
+                      <ComboboxItem key={issueKey} value={issueKey} className="whitespace-nowrap">
                         <span className="font-medium shrink-0">{issueKey}</span>
-                        <span className="text-muted-foreground truncate">
-                          {issue?.issue_name}
-                        </span>
+                        <span className="text-muted-foreground truncate">{issue?.issue_name}</span>
                       </ComboboxItem>
                     )
                   }}

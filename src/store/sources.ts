@@ -1,11 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import {
-  computePeriodRange,
-  daysBetweenInclusive,
-  todayDate,
-} from '@/lib/date-range'
+import { computePeriodRange, daysBetweenInclusive, todayDate } from '@/lib/date-range'
 
 export type PeriodMode = 'day' | 'week' | 'month' | 'custom'
 export type SourceSubtab = 'jira-issues' | 'jira-worklogs' | 'gcal-events' | 'tempo-capacity'

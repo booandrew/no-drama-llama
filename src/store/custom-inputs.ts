@@ -1,11 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import {
-  computePeriodRange,
-  daysBetweenInclusive,
-  todayDate,
-} from '@/lib/date-range'
+import { computePeriodRange, daysBetweenInclusive, todayDate } from '@/lib/date-range'
 import type { DdsCustomInput } from '@/lib/duckdb/queries'
 import { logAction } from '@/store/activity-log'
 import {

@@ -8,7 +8,12 @@ export function useGoogleCalendarConnect() {
   const { status, setConnected, setStatus, disconnect } = useCalendarStore()
 
   const connect = useCallback(
-    (clientId: string, method: CalendarAuthMethod, clientSecret?: string, forceConsent?: boolean) => {
+    (
+      clientId: string,
+      method: CalendarAuthMethod,
+      clientSecret?: string,
+      forceConsent?: boolean,
+    ) => {
       if (!window.google?.accounts?.oauth2) return
 
       const codeClient = google.accounts.oauth2.initCodeClient({

@@ -19,7 +19,13 @@ const allChartConfig: ChartConfig = {
   total: { label: 'Total', color: 'var(--foreground)' },
 }
 
-export function ActivityAreaChart({ data, periodLabel, xAxisLabel, projects, projectColors }: Props) {
+export function ActivityAreaChart({
+  data,
+  periodLabel,
+  xAxisLabel,
+  projects,
+  projectColors,
+}: Props) {
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set(projects))
   const activeProjects = useMemo(() => {
     const next = new Set(projects.filter((project) => selectedProjects.has(project)))

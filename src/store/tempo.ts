@@ -71,7 +71,9 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
     set({
       status: 'expired',
       connectionHealth: 'unhealthy',
-      error: message ?? 'Tempo token is invalid, expired, or revoked. Generate a new one in Tempo Settings.',
+      error:
+        message ??
+        'Tempo token is invalid, expired, or revoked. Generate a new one in Tempo Settings.',
     }),
 
   disconnect: async () => {

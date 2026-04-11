@@ -73,11 +73,7 @@ interface MonthData {
   worklogs: DdsJiraWorklog[]
 }
 
-function aggregateFromTasks(
-  allTasks: DdsTask[],
-  period: 'month' | 'year',
-  selectedMonth: number,
-) {
+function aggregateFromTasks(allTasks: DdsTask[], period: 'month' | 'year', selectedMonth: number) {
   // Aggregate hours by project
   const projectHoursMap = new Map<string, number>()
   for (const t of allTasks) {
@@ -94,7 +90,7 @@ function aggregateFromTasks(
   // Bar data
   const barData = projects.map((p) => ({
     project: p,
-    hours: Math.round((projectHoursMap.get(p) ?? 0) / 60 * 10) / 10,
+    hours: Math.round(((projectHoursMap.get(p) ?? 0) / 60) * 10) / 10,
   }))
 
   // Timeline data
@@ -116,7 +112,7 @@ function aggregateFromTasks(
       const bucket = monthBuckets.get(month)!
       const row: Record<string, string | number> = { month }
       for (const p of projects) {
-        row[p] = Math.round((bucket.get(p) ?? 0) / 60 * 10) / 10
+        row[p] = Math.round(((bucket.get(p) ?? 0) / 60) * 10) / 10
       }
       return row
     })
@@ -140,7 +136,7 @@ function aggregateFromTasks(
       const bucket = dayBuckets.get(day)!
       const row: Record<string, string | number> = { month: String(day) }
       for (const p of projects) {
-        row[p] = Math.round((bucket.get(p) ?? 0) / 60 * 10) / 10
+        row[p] = Math.round(((bucket.get(p) ?? 0) / 60) * 10) / 10
       }
       return row
     })

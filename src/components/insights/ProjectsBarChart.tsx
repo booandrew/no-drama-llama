@@ -42,10 +42,7 @@ export function ProjectsBarChart({ data, periodLabel, projectColors }: Props) {
             <ChartTooltip content={<ChartTooltipContent />} />
             <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
               {data.map((entry) => (
-                <Cell
-                  key={entry.project}
-                  fill={projectColors[entry.project] ?? 'var(--chart-1)'}
-                />
+                <Cell key={entry.project} fill={projectColors[entry.project] ?? 'var(--chart-1)'} />
               ))}
             </Bar>
           </BarChart>

@@ -70,10 +70,7 @@ function LlamaSidebar() {
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
   const worklogs = useTasksStore((s) => s.worklogs)
   const dailyCapacity = useTasksStore((s) => s.dailyCapacity)
-  const llamaAvatarSvg = useMemo(
-    () => getCurrentLlama(),
-    [],
-  )
+  const llamaAvatarSvg = useMemo(() => getCurrentLlama(), [])
 
   const { loggedHours, expectedHours } = useMemo(() => {
     let loggedSec = 0
@@ -150,8 +147,18 @@ function parseDurationToMin(dur: string): number {
 }
 
 const SUMMARY_MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 function SummaryCard() {
@@ -169,12 +176,18 @@ function SummaryCard() {
     const projectMin = new Map<string, number>()
     for (const t of tasks) {
       if (!t.project_key) continue
-      projectMin.set(t.project_key, (projectMin.get(t.project_key) ?? 0) + parseDurationToMin(t.duration))
+      projectMin.set(
+        t.project_key,
+        (projectMin.get(t.project_key) ?? 0) + parseDurationToMin(t.duration),
+      )
     }
     for (const wl of worklogs) {
       const issue = issueMap.get(wl.issue_key)
       if (!issue?.project_key) continue
-      projectMin.set(issue.project_key, (projectMin.get(issue.project_key) ?? 0) + parseDurationToMin(wl.time_spent))
+      projectMin.set(
+        issue.project_key,
+        (projectMin.get(issue.project_key) ?? 0) + parseDurationToMin(wl.time_spent),
+      )
     }
     const projectData = Array.from(projectMin.entries())
       .map(([name, min]) => ({ name, hours: +(min / 60).toFixed(1) }))
@@ -211,10 +224,7 @@ function SummaryCard() {
   }, [tasks, worklogs, issues])
 
   const chartData = view === 'projects' ? projectData : issueData
-  const totalHours = useMemo(
-    () => chartData.reduce((s, d) => s + d.hours, 0),
-    [chartData],
-  )
+  const totalHours = useMemo(() => chartData.reduce((s, d) => s + d.hours, 0), [chartData])
 
   return (
     <Card className="flex flex-1 flex-col gap-0 py-0">

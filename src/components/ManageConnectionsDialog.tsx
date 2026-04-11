@@ -214,10 +214,8 @@ function GCalTab() {
               className="flex-1"
               disabled={!gisReady}
               onClick={() => {
-                const clientId =
-                  authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
-                const secret =
-                  authMethod === 'personal' ? readPersonalClientSecret() : undefined
+                const clientId = authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
+                const secret = authMethod === 'personal' ? readPersonalClientSecret() : undefined
                 if (clientId) initAndConnect(clientId, authMethod ?? 'org', secret, true)
               }}
             >

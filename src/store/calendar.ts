@@ -227,7 +227,7 @@ export const useCalendarStore = create<CalendarState>()(
                 const selectedDate = readPersistedSelectedDate()
                 return selectedDate ? periodFromDate(selectedDate) : currentPeriod()
               })()
-            : state.selectedPeriod ?? currentPeriod()
+            : (state.selectedPeriod ?? currentPeriod())
 
         return {
           authMethod: state.authMethod ?? null,

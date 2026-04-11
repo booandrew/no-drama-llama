@@ -96,11 +96,7 @@ interface WeekCalendarViewProps {
   onTaskClick: (task: DdsTask) => void
 }
 
-export function WeekCalendarView({
-  selectedDate,
-  tasks,
-  onTaskClick,
-}: WeekCalendarViewProps) {
+export function WeekCalendarView({ selectedDate, tasks, onTaskClick }: WeekCalendarViewProps) {
   const monday = useMemo(() => getMonday(selectedDate), [selectedDate])
 
   const weekDays = useMemo(() => {

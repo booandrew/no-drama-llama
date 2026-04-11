@@ -201,7 +201,9 @@ export const useJiraStore = create<JiraState>()(
             throw new Error(data?.error ?? `Auth failed: ${res.status}`)
           }
           if (!data?.accountId) {
-            throw new Error('Jira API token validation succeeded, but account details were missing.')
+            throw new Error(
+              'Jira API token validation succeeded, but account details were missing.',
+            )
           }
 
           set({

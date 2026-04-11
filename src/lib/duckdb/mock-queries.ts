@@ -35,7 +35,12 @@ function filterByDateRange<T>(rows: T[], field: keyof T, start: string, end: str
   })
 }
 
-function filterByDatePrefixRange<T>(rows: T[], field: keyof T, start: string, endExclusive: string): T[] {
+function filterByDatePrefixRange<T>(
+  rows: T[],
+  field: keyof T,
+  start: string,
+  endExclusive: string,
+): T[] {
   return rows.filter((r) => {
     const val = r[field]
     if (typeof val !== 'string') return false
@@ -53,7 +58,12 @@ export function readSrcJiraWorklogs(
   dateStart: string,
   dateEndExclusive: string,
 ): Promise<(SrcJiraWorklog & { loaded_at: string })[]> {
-  const filtered = filterByDatePrefixRange(mockSrcJiraWorklogs, 'started', dateStart, dateEndExclusive)
+  const filtered = filterByDatePrefixRange(
+    mockSrcJiraWorklogs,
+    'started',
+    dateStart,
+    dateEndExclusive,
+  )
   return Promise.resolve(filtered.sort((a, b) => a.started.localeCompare(b.started)))
 }
 
@@ -79,7 +89,10 @@ export function readSrcTempoWorkloadDays(): Promise<
   return Promise.resolve(sorted)
 }
 
-export function readSrcTempoHolidays(dateStart: string, dateEndExclusive: string): Promise<(SrcTempoHoliday & { loaded_at: string })[]> {
+export function readSrcTempoHolidays(
+  dateStart: string,
+  dateEndExclusive: string,
+): Promise<(SrcTempoHoliday & { loaded_at: string })[]> {
   const filtered = filterByDateRange(mockSrcTempoHolidays, 'date', dateStart, dateEndExclusive)
   return Promise.resolve(filtered.sort((a, b) => a.date.localeCompare(b.date)))
 }
@@ -93,7 +106,12 @@ export function readDdsJiraWorklogs(
   dateStart: string,
   dateEndExclusive: string,
 ): Promise<DdsJiraWorklog[]> {
-  const filtered = filterByDatePrefixRange(mockDdsJiraWorklogs, 'started', dateStart, dateEndExclusive)
+  const filtered = filterByDatePrefixRange(
+    mockDdsJiraWorklogs,
+    'started',
+    dateStart,
+    dateEndExclusive,
+  )
   return Promise.resolve(filtered.sort((a, b) => a.started.localeCompare(b.started)))
 }
 

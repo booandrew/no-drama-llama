@@ -13,12 +13,7 @@ interface MonthCalendarViewProps {
   onTaskClick: (task: DdsTask) => void
 }
 
-export function MonthCalendarView({
-  year,
-  month,
-  tasks,
-  onTaskClick,
-}: MonthCalendarViewProps) {
+export function MonthCalendarView({ year, month, tasks, onTaskClick }: MonthCalendarViewProps) {
   const { cells, tasksByDate } = useMemo(() => {
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
@@ -56,10 +51,7 @@ export function MonthCalendarView({
       {/* Day-of-week headers */}
       <div className="grid shrink-0 grid-cols-7 border-b">
         {DAY_HEADERS.map((name) => (
-          <div
-            key={name}
-            className="py-2 text-center text-xs font-medium text-muted-foreground"
-          >
+          <div key={name} className="py-2 text-center text-xs font-medium text-muted-foreground">
             {name}
           </div>
         ))}
@@ -86,12 +78,7 @@ export function MonthCalendarView({
               </div>
               <div className="flex flex-col gap-0.5 min-h-0 overflow-hidden">
                 {dayTasks.slice(0, maxVisible).map((t) => (
-                  <EventBlock
-                    key={t.task_id}
-                    task={t}
-                    compact
-                    onClick={onTaskClick}
-                  />
+                  <EventBlock key={t.task_id} task={t} compact onClick={onTaskClick} />
                 ))}
                 {dayTasks.length > maxVisible && (
                   <span className="text-xs text-muted-foreground/70 pl-2.5">

@@ -373,10 +373,7 @@ export async function replaceSrcTempoHolidaysInRange(
 
   if (rows.length > 0) {
     const incomingKeyWhere = rows
-      .map(
-        (r) =>
-          `(scheme_id = ${escSql(r.scheme_id)} AND holiday_id = ${escSql(r.holiday_id)})`,
-      )
+      .map((r) => `(scheme_id = ${escSql(r.scheme_id)} AND holiday_id = ${escSql(r.holiday_id)})`)
       .join(' OR ')
     await exec(`DELETE FROM src_tempo_holidays WHERE ${incomingKeyWhere}`)
   }

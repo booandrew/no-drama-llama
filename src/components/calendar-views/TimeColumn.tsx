@@ -18,9 +18,7 @@ export function TimeColumn({ startHour = 0, endHour = 24, hourHeight }: TimeColu
           className="relative text-right pr-2 text-xs text-muted-foreground"
           style={{ height: hourHeight }}
         >
-          <span className="absolute -top-2 right-2">
-            {String(h).padStart(2, '0')}:00
-          </span>
+          <span className="absolute -top-2 right-2">{String(h).padStart(2, '0')}:00</span>
         </div>
       ))}
     </div>
