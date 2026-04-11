@@ -5,6 +5,17 @@ import { logAction } from '@/store/activity-log'
 type TempoStatus = 'idle' | 'connected' | 'error' | 'expired'
 export type ConnectionHealth = 'unknown' | 'healthy' | 'unhealthy'
 
+interface TempoHealthResponse {
+  healthy: boolean
+  code?: 'ok' | 'missing_scope' | 'expired' | 'invalid' | 'probe_failed'
+  error?: string
+  missingScopes?: string[]
+  capabilities?: {
+    userSchedule: boolean
+    worklogs: boolean
+  }
+}
+
 interface TempoState {
   status: TempoStatus
   connectionHealth: ConnectionHealth
@@ -13,7 +24,7 @@ interface TempoState {
 
   setToken: (token: string) => Promise<void>
   setStatus: (status: TempoStatus) => void
-  setExpired: () => void
+  setExpired: (message?: string) => void
   disconnect: () => Promise<void>
   checkAuthStatus: () => Promise<void>
   checkHealth: () => Promise<void>
@@ -26,26 +37,41 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
   _authChecked: false,
 
   setToken: async (token) => {
-    logAction('connection', 'success', 'Connected to Tempo')
     try {
       const res = await fetch('/tempo-api/.auth/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       })
-      if (!res.ok) throw new Error(`Failed to store token: ${res.status}`)
+
+      const data = (await res.json().catch(() => null)) as TempoHealthResponse | null
+      if (!res.ok) {
+        if (data?.code === 'expired' || data?.code === 'invalid') {
+          set({
+            status: 'expired',
+            connectionHealth: 'unhealthy',
+            error: data.error ?? 'Tempo token is invalid, expired, or revoked.',
+          })
+          return
+        }
+        throw new Error(data?.error ?? `Failed to validate Tempo token: ${res.status}`)
+      }
+
       set({ status: 'connected', connectionHealth: 'healthy', error: null })
+      logAction('connection', 'success', 'Connected to Tempo')
     } catch (e) {
+      logAction('connection', 'error', 'Failed to connect to Tempo')
       set({ status: 'error', connectionHealth: 'unhealthy', error: (e as Error).message })
     }
   },
 
   setStatus: (status) => set({ status }),
 
-  setExpired: () =>
+  setExpired: (message) =>
     set({
       status: 'expired',
-      error: 'API token expired or revoked. Please generate a new one in Tempo Settings.',
+      connectionHealth: 'unhealthy',
+      error: message ?? 'Tempo token is invalid, expired, or revoked. Generate a new one in Tempo Settings.',
     }),
 
   disconnect: async () => {
@@ -64,8 +90,10 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
       if (!res.ok) return
       const data = await res.json()
       if (data.connected) {
-        set({ status: 'connected' })
+        set({ status: 'connected', error: null })
         get().checkHealth()
+      } else {
+        set({ status: 'idle', connectionHealth: 'unknown', error: null })
       }
     } catch {
       // offline or not deployed yet
@@ -80,9 +108,33 @@ export const useTempoStore = create<TempoState>()((set, get) => ({
     try {
       const res = await fetch('/tempo-api/.auth/health')
       if (!res.ok) return
-      const data = await res.json()
-      set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
-      if (!data.healthy) set({ status: 'expired' })
+      const data = (await res.json()) as TempoHealthResponse
+
+      if (data.healthy) {
+        set({ status: 'connected', connectionHealth: 'healthy', error: null })
+        return
+      }
+
+      if (data.code === 'expired' || data.code === 'invalid') {
+        get().setExpired(data.error)
+        return
+      }
+
+      if (data.code === 'missing_scope') {
+        set({
+          status: 'error',
+          connectionHealth: 'unhealthy',
+          error:
+            data.error ??
+            'Tempo token is missing required scopes. Reconnect with Schemes (View) and Worklogs (View).',
+        })
+        return
+      }
+
+      set({
+        connectionHealth: 'unhealthy',
+        error: data.error ?? 'Tempo health check failed. Please try again.',
+      })
     } catch {
       // network error — don't change state
     }

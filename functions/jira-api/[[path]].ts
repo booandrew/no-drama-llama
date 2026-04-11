@@ -1,4 +1,8 @@
 import { getCookie, setCookie, clearCookie } from '../_shared/cookies'
+import {
+  validateJiraOAuthAccess,
+  validateJiraTokenAccess,
+} from '../_shared/jira-validation'
 import { createProxy } from '../_shared/proxy'
 
 interface Env {
@@ -82,7 +86,7 @@ function handleStatus(request: Request): Response {
 async function handleHealth(request: Request, env: Env, url: URL): Promise<Response> {
   const authMethod = getCookie(request, 'jira_auth_method')
   if (!authMethod) {
-    return Response.json({ healthy: false, error: 'Not configured' })
+    return Response.json({ healthy: false, code: 'invalid', error: 'Not configured' })
   }
 
   try {
@@ -91,18 +95,28 @@ async function handleHealth(request: Request, env: Env, url: URL): Promise<Respo
       const apiToken = getCookie(request, 'jira_api_token')
       const siteUrl = getCookie(request, 'jira_site_url')
       if (!email || !apiToken || !siteUrl) {
-        return Response.json({ healthy: false, error: 'Missing token credentials' })
+        return Response.json({ healthy: false, code: 'invalid', error: 'Missing token credentials' })
       }
       const basic = btoa(`${email}:${apiToken}`)
-      const res = await fetch(`https://${siteUrl}/rest/api/3/myself`, {
-        headers: { Authorization: `Basic ${basic}`, Accept: 'application/json' },
+      const validation = await validateJiraTokenAccess(siteUrl, basic)
+      return Response.json({
+        healthy: validation.ok,
+        code: validation.code,
+        error: validation.message,
       })
-      if (res.ok) return Response.json({ healthy: true })
-      return Response.json({ healthy: false, error: `Jira API: ${res.status}` })
     }
 
     // OAuth flow
     let accessToken = getCookie(request, 'jira_access_token')
+    const cloudId = getCookie(request, 'jira_cloud_id')
+    if (!cloudId) {
+      return Response.json({
+        healthy: false,
+        code: 'invalid',
+        error: 'Missing Jira cloud ID',
+      })
+    }
+
     if (!accessToken) {
       // Try refresh
       const refreshToken = getCookie(request, 'jira_refresh_token')
@@ -139,26 +153,28 @@ async function handleHealth(request: Request, env: Env, url: URL): Promise<Respo
             'Set-Cookie',
             setCookie('jira_refresh_token', data.refresh_token, cookieOpts),
           )
-          // Verify with refreshed token
-          const meRes = await fetch('https://api.atlassian.com/me', {
-            headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' },
-          })
+          const validation = await validateJiraOAuthAccess(data.access_token, cloudId)
           return new Response(
-            JSON.stringify({ healthy: meRes.ok, error: meRes.ok ? undefined : `Jira API: ${meRes.status}` }),
+            JSON.stringify({
+              healthy: validation.ok,
+              code: validation.code,
+              error: validation.message,
+            }),
             { headers },
           )
         }
       }
-      return Response.json({ healthy: false, error: 'Token expired, refresh failed' })
+      return Response.json({ healthy: false, code: 'expired', error: 'Token expired, refresh failed' })
     }
 
-    const res = await fetch('https://api.atlassian.com/me', {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    const validation = await validateJiraOAuthAccess(accessToken, cloudId)
+    return Response.json({
+      healthy: validation.ok,
+      code: validation.code,
+      error: validation.message,
     })
-    if (res.ok) return Response.json({ healthy: true })
-    return Response.json({ healthy: false, error: `Jira API: ${res.status}` })
   } catch (e) {
-    return Response.json({ healthy: false, error: (e as Error).message })
+    return Response.json({ healthy: false, code: 'probe_failed', error: (e as Error).message })
   }
 }
 

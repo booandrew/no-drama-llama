@@ -28,10 +28,10 @@ export function useConnectionHealth() {
       if (isConnected(calStatus) || calStatus === 'expired' || calStatus === 'error') {
         useCalendarStore.getState().checkHealth()
       }
-      if (isConnected(jiraStatus) || jiraStatus === 'expired') {
+      if (isConnected(jiraStatus) || jiraStatus === 'expired' || jiraStatus === 'error') {
         useJiraStore.getState().checkHealth()
       }
-      if (isConnected(tempoStatus) || tempoStatus === 'expired') {
+      if (isConnected(tempoStatus) || tempoStatus === 'expired' || tempoStatus === 'error') {
         useTempoStore.getState().checkHealth()
       }
     }

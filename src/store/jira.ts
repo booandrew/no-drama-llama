@@ -10,6 +10,17 @@ type JiraStatus = 'idle' | 'connected' | 'loading' | 'done' | 'error' | 'expired
 export type JiraAuthMethod = 'oauth-org' | 'token'
 export type ConnectionHealth = 'unknown' | 'healthy' | 'unhealthy'
 
+interface JiraHealthResponse {
+  healthy?: boolean
+  code?: 'ok' | 'missing_scope' | 'expired' | 'invalid' | 'insufficient_access' | 'probe_failed'
+  error?: string
+  connected?: boolean
+  cloudId?: string
+  accountId?: string
+  authMethod?: JiraAuthMethod
+  siteUrl?: string
+}
+
 const JIRA_SCOPES = 'read:jira-work read:me offline_access'
 const REDIRECT_URI = () => window.location.origin
 const ORG_CLIENT_ID = import.meta.env.VITE_JIRA_CLIENT_ID as string | undefined
@@ -32,7 +43,7 @@ interface JiraState {
   setHydrated: () => void
   setStatus: (status: JiraStatus) => void
   disconnect: () => Promise<void>
-  setExpired: () => void
+  setExpired: (message?: string) => void
   isTokenValid: () => boolean
   exchangeCode: (code: string) => Promise<void>
   startOAuth: () => Promise<void>
@@ -89,7 +100,14 @@ export const useJiraStore = create<JiraState>()(
         return expiresAt > Date.now() + 60_000
       },
 
-      setExpired: () => set({ status: 'expired' }),
+      setExpired: (message) =>
+        set({
+          status: 'expired',
+          connectionHealth: 'unhealthy',
+          error:
+            message ??
+            'Jira access has expired or is no longer valid. Re-connect to continue syncing.',
+        }),
 
       startOAuth: async () => {
         if (!ORG_CLIENT_ID) return
@@ -144,14 +162,14 @@ export const useJiraStore = create<JiraState>()(
           })
 
           if (!res.ok) {
-            const err = await res.text()
-            throw new Error(`Token exchange failed: ${res.status} ${err}`)
+            const data = (await res.json().catch(() => null)) as JiraHealthResponse | null
+            throw new Error(data?.error ?? `Token exchange failed: ${res.status}`)
           }
 
-          const data = await res.json()
+          const data = (await res.json()) as JiraHealthResponse
           set({
-            cloudId: data.cloudId,
-            accountId: data.accountId,
+            cloudId: data.cloudId ?? null,
+            accountId: data.accountId ?? null,
             authMethod: data.authMethod ?? 'oauth-org',
             status: 'connected',
             connectionHealth: 'healthy',
@@ -174,12 +192,18 @@ export const useJiraStore = create<JiraState>()(
             body: JSON.stringify({ siteUrl, email, apiToken }),
           })
 
+          const data = (await res.json().catch(() => null)) as JiraHealthResponse | null
           if (!res.ok) {
-            const data = await res.json().catch(() => null)
+            if (data?.code === 'expired' || data?.code === 'invalid') {
+              get().setExpired(data.error)
+              return
+            }
             throw new Error(data?.error ?? `Auth failed: ${res.status}`)
           }
+          if (!data?.accountId) {
+            throw new Error('Jira API token validation succeeded, but account details were missing.')
+          }
 
-          const data = await res.json()
           set({
             authMethod: 'token',
             accountId: data.accountId,
@@ -200,7 +224,7 @@ export const useJiraStore = create<JiraState>()(
         try {
           const res = await fetch('/jira-api/.auth/status')
           if (!res.ok) return
-          const data = await res.json()
+          const data = (await res.json()) as JiraHealthResponse
           if (data.connected) {
             set({
               status: 'connected',
@@ -208,10 +232,11 @@ export const useJiraStore = create<JiraState>()(
               accountId: data.accountId ?? null,
               cloudId: data.cloudId ?? null,
               siteUrl: data.siteUrl ?? null,
+              error: null,
             })
             get().checkHealth()
           } else {
-            set({ status: 'idle', connectionHealth: 'unknown' })
+            set({ status: 'idle', connectionHealth: 'unknown', error: null })
           }
         } catch {
           // offline or not deployed yet — keep current state
@@ -226,9 +251,22 @@ export const useJiraStore = create<JiraState>()(
         try {
           const res = await fetch('/jira-api/.auth/health')
           if (!res.ok) return
-          const data = await res.json()
-          set({ connectionHealth: data.healthy ? 'healthy' : 'unhealthy' })
-          if (!data.healthy) set({ status: 'expired' })
+          const data = (await res.json()) as JiraHealthResponse
+          if (data.healthy) {
+            set({ status: 'connected', connectionHealth: 'healthy', error: null })
+            return
+          }
+          if (data.code === 'expired' || data.code === 'invalid') {
+            get().setExpired(data.error)
+            return
+          }
+          set({
+            status: 'error',
+            connectionHealth: 'unhealthy',
+            error:
+              data.error ??
+              'Jira connection is valid for authentication, but issue/worklog reads are unavailable.',
+          })
         } catch {
           // network error — don't change state
         }

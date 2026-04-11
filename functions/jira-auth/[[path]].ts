@@ -1,4 +1,8 @@
 import { setCookie, clearCookie } from '../_shared/cookies'
+import {
+  validateJiraOAuthAccess,
+  validateJiraTokenAccess,
+} from '../_shared/jira-validation'
 
 interface Env {
   JIRA_CLIENT_SECRET?: string
@@ -73,6 +77,17 @@ async function handleOAuthToken(request: Request, env: Env, url: URL): Promise<R
     }
     const me = await meRes.json<{ account_id: string }>()
 
+    const validation = await validateJiraOAuthAccess(tokenData.access_token, cloudId)
+    if (!validation.ok) {
+      return new Response(
+        JSON.stringify({ error: validation.message, code: validation.code }),
+        {
+          status: validation.code === 'expired' ? 401 : 403,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
     // 4. Set cookies (include client_id for later refresh)
     const cookieOpts = { url }
     const cookies = [
@@ -128,6 +143,17 @@ async function handleConnectToken(request: Request, url: URL): Promise<Response>
       )
     }
     const me = await meRes.json<{ accountId: string }>()
+
+    const validation = await validateJiraTokenAccess(siteUrl, basicAuth)
+    if (!validation.ok) {
+      return new Response(
+        JSON.stringify({ error: validation.message, code: validation.code }),
+        {
+          status: validation.code === 'invalid' ? 401 : 403,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
+    }
 
     const cookieOpts = { url }
     const cookies = [

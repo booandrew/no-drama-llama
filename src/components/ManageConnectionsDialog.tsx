@@ -31,7 +31,7 @@ function StatusBadge({ health, status }: { health: ConnectionHealth; status: str
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
       <StatusDot health={health} status={status} />
-      {isUnhealthy ? 'Disconnected' : 'Connected'}
+      {isUnhealthy ? 'Needs attention' : 'Connected'}
     </span>
   )
 }
@@ -314,6 +314,7 @@ function JiraTab() {
   const status = useJiraStore((s) => s.status)
   const authMethod = useJiraStore((s) => s.authMethod)
   const health = useJiraStore((s) => s.connectionHealth)
+  const error = useJiraStore((s) => s.error)
   const disconnect = useJiraStore((s) => s.disconnect)
   const startOAuth = useJiraStore((s) => s.startOAuth)
   const connectWithToken = useJiraStore((s) => s.connectWithToken)
@@ -380,9 +381,10 @@ function JiraTab() {
         </a>
         {broken && (
           <p className="text-sm text-destructive">
-            {authMethod === 'oauth-org'
-              ? 'OAuth session expired. Token refresh failed — please re-connect.'
-              : 'API token expired or revoked. Please generate a new one.'}
+            {error ??
+              (authMethod === 'oauth-org'
+                ? 'Jira OAuth needs attention. Re-connect to restore issue and worklog access.'
+                : 'Jira API-token access needs attention. Reconnect or switch to OAuth.')}
           </p>
         )}
         <div className="flex gap-2">
@@ -402,8 +404,16 @@ function JiraTab() {
   // Not connected — show connect form
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">Connect Jira to pull issues and worklogs.</p>
+      <p className="text-sm text-muted-foreground">
+        Connect Jira to pull issue metadata and read your Jira worklogs.
+      </p>
       {hasOrgMethod && <Button onClick={handleConnectOrg}>Connect with OAuth</Button>}
+      {hasOrgMethod && (
+        <p className="text-muted-foreground text-xs">
+          Recommended. This app requests <strong>read:jira-work</strong>, <strong>read:me</strong>,
+          and <strong>offline_access</strong>.
+        </p>
+      )}
       {hasOrgMethod && (
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -431,6 +441,11 @@ function JiraTab() {
               </a>
             </li>
             <li>Create an API token and copy it</li>
+            <li>Use your Atlassian account email address with that token</li>
+            <li>
+              If you created a <strong>scoped</strong> API token, prefer OAuth instead. This
+              fallback path calls your Jira site REST API directly.
+            </li>
           </ol>
         </div>
         <div className="flex flex-col gap-2">
@@ -459,6 +474,10 @@ function JiraTab() {
             />
           </div>
         </div>
+        <p className="text-muted-foreground text-xs">
+          OAuth is the recommended Jira connection. API-token mode is a fallback for site-level
+          basic auth.
+        </p>
         {tokenError && <p className="text-destructive text-sm">{tokenError}</p>}
         <Button
           onClick={handleConnectToken}
@@ -477,6 +496,7 @@ function JiraTab() {
 function TempoTab() {
   const status = useTempoStore((s) => s.status)
   const health = useTempoStore((s) => s.connectionHealth)
+  const error = useTempoStore((s) => s.error)
   const disconnect = useTempoStore((s) => s.disconnect)
   const setToken = useTempoStore((s) => s.setToken)
   const [tokenInput, setTokenInput] = useState('')
@@ -552,7 +572,8 @@ function TempoTab() {
         )}
         {broken && (
           <p className="text-sm text-destructive">
-            API token expired or revoked. Generate a new one in Tempo Settings.
+            {error ??
+              'Tempo connection needs attention. Reconnect with a token that has Schemes (View) and Worklogs (View).'}
           </p>
         )}
         <Button variant="outline" size="sm" onClick={disconnect}>
@@ -566,10 +587,11 @@ function TempoTab() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Connect Tempo to pull worklogs and capacity data.
+        Connect Tempo to pull worklogs and capacity data. This app validates both capabilities
+        during setup.
       </p>
       <div className="text-muted-foreground space-y-1 text-sm">
-        <p className="text-foreground font-medium">How to get your API token:</p>
+        <p className="text-foreground font-medium">How to create a compatible Tempo token:</p>
         <ol className="list-inside list-decimal space-y-0.5 text-xs">
           <li>
             Open Tempo Settings &rarr; Data Access &rarr; API Integration
@@ -600,9 +622,16 @@ function TempoTab() {
             </div>
           </li>
           <li>
-            Click <strong>New Token</strong>, select scope: <strong>Schemes</strong> (View)
+            Click <strong>New Token</strong>
           </li>
-          <li>Copy the generated token (shown only once)</li>
+          <li>
+            Enable <strong>Schemes</strong> (<strong>View</strong>) for user schedule and capacity
+          </li>
+          <li>
+            Enable <strong>Worklogs</strong> (<strong>View</strong>) for worklogs and work
+            attributes
+          </li>
+          <li>Choose an expiry that fits your usage, then copy the token value</li>
         </ol>
       </div>
       <div className="flex flex-col gap-2">
@@ -614,7 +643,11 @@ function TempoTab() {
           value={tokenInput}
           onChange={(e) => setTokenInput(e.target.value)}
         />
+        <p className="text-muted-foreground text-xs">
+          Required scopes: <strong>Schemes</strong> (View) and <strong>Worklogs</strong> (View)
+        </p>
       </div>
+      {error && <p className="text-destructive text-sm">{error}</p>}
       <Button onClick={handleConnect} disabled={!tokenInput.trim() || connecting}>
         {connecting ? 'Connecting...' : 'Connect to Tempo'}
       </Button>
