@@ -1,9 +1,29 @@
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function buildProxyTargetUrl(
+  requestUrl: URL,
+  targetOrigin: string,
+  stripPrefix: string,
+): URL | null {
+  const upstream = new URL(targetOrigin)
+  const prefix = new RegExp(`^/${escapeRegex(stripPrefix)}(?:/|$)`)
+  const strippedPath = requestUrl.pathname.replace(prefix, '').replace(/^\/+/, '')
+  const normalizedPath = `/${strippedPath}`
+  const targetUrl = new URL(`${normalizedPath}${requestUrl.search}`, upstream)
+
+  return targetUrl.origin === upstream.origin ? targetUrl : null
+}
+
 export function createProxy(targetOrigin: string, stripPrefix: string) {
   const handler: PagesFunction = async (context) => {
     const { request } = context
     const url = new URL(request.url)
-    const targetPath = url.pathname.replace(new RegExp(`^/${stripPrefix}`), '')
-    const targetUrl = new URL(targetPath + url.search, targetOrigin)
+    const targetUrl = buildProxyTargetUrl(url, targetOrigin, stripPrefix)
+    if (!targetUrl) {
+      return new Response('Invalid proxy path', { status: 400 })
+    }
 
     const headers = new Headers(request.headers)
     headers.set('Host', targetUrl.hostname)

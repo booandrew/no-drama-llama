@@ -1,5 +1,6 @@
 import { getCookie } from '../_shared/cookies'
 import { jiraSiteHostError, normalizeJiraSiteHost } from '../_shared/jira-site'
+import { buildProxyTargetUrl } from '../_shared/proxy'
 
 export const onRequest: PagesFunction = async (context) => {
   const { request } = context
@@ -23,8 +24,10 @@ export const onRequest: PagesFunction = async (context) => {
   }
 
   const url = new URL(request.url)
-  const targetPath = url.pathname.replace(/^\/jira-site/, '')
-  const targetUrl = new URL(targetPath + url.search, `https://${normalizedSiteUrl}`)
+  const targetUrl = buildProxyTargetUrl(url, `https://${normalizedSiteUrl}`, 'jira-site')
+  if (!targetUrl) {
+    return new Response('Invalid Jira proxy path', { status: 400 })
+  }
 
   const basicAuth = btoa(`${email}:${apiToken}`)
   const headers = new Headers(request.headers)
