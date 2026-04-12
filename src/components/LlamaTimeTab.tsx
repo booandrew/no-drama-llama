@@ -356,7 +356,6 @@ function MiniTimeline({
 // LlamaTimeToolbar — action buttons (full-width row)
 // ---------------------------------------------------------------------------
 export function LlamaTimeToolbar() {
-  const isMockMode = useAppStore((s) => s.isMockMode)
   const viewMode = useAppStore((s) => s.viewMode)
   const setViewMode = useAppStore((s) => s.setViewMode)
   const selectedDate = useAppStore((s) => s.selectedDate)
@@ -535,29 +534,23 @@ export function LlamaTimeToolbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {isMockMode ? (
-          <span className="text-muted-foreground text-xs">Mock mode — using synthetic data</span>
-        ) : (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              disabled={syncing || aggregateStatus === 'none'}
-              onClick={handleLoadSources}
-            >
-              {syncing ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Load Sources
-            </Button>
-            <Button variant="default" size="sm" className="text-xs" disabled>
-              I'm good with timelogs, Submit to JIRA
-            </Button>
-          </>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          disabled={syncing || aggregateStatus === 'none'}
+          onClick={handleLoadSources}
+        >
+          {syncing ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Load Sources
+        </Button>
+        <Button variant="default" size="sm" className="text-xs" disabled>
+          I'm good with timelogs, Submit to JIRA
+        </Button>
       </div>
     </div>
   )
@@ -567,7 +560,6 @@ export function LlamaTimeToolbar() {
 // LlamaTimeTab
 // ---------------------------------------------------------------------------
 export function LlamaTimeTab() {
-  const isMockMode = useAppStore((s) => s.isMockMode)
   const viewMode = useAppStore((s) => s.viewMode)
   const selectedDate = useAppStore((s) => s.selectedDate)
   const selectedPeriod = useCalendarStore((s) => s.selectedPeriod)
@@ -588,7 +580,7 @@ export function LlamaTimeTab() {
 
   // Auto-open dialog only after all auth checks have resolved with no connections
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
-  if (!isMockMode && !hasAutoOpened && allAuthChecked) {
+  if (!hasAutoOpened && allAuthChecked) {
     if (aggregateStatus === 'none') {
       setConnectDialogOpen(true)
     }
@@ -597,14 +589,10 @@ export function LlamaTimeTab() {
 
   // Load all data when period or readiness changes
   useEffect(() => {
-    if (isMockMode) {
-      loadTasks(selectedPeriod.year, selectedPeriod.month)
-      return
-    }
     if (isReady) {
       loadTasks(selectedPeriod.year, selectedPeriod.month)
     }
-  }, [selectedPeriod.year, selectedPeriod.month, isReady, isMockMode, loadTasks])
+  }, [selectedPeriod.year, selectedPeriod.month, isReady, loadTasks])
 
   // Build unified task list and groups
   const { allTasks, taskGroups, barColors } = useMemo(() => {

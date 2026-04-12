@@ -9,11 +9,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import * as realQueries from '@/lib/duckdb/queries'
-import * as mockQueries from '@/lib/duckdb/mock-queries'
 import { syncJiraIssues, syncJiraWorklogs, syncCalendarEvents, syncTempoCapacity } from '@/lib/sync'
 import { initializeDuckDB } from '@/lib/duckdb/init'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
-import { useAppStore } from '@/store/app'
 import { useCalendarStore } from '@/store/calendar'
 import { useJiraStore } from '@/store/jira'
 import { useTempoStore } from '@/store/tempo'
@@ -115,7 +113,6 @@ type TempoView = 'workload-days' | 'holidays' | 'daily-capacity'
 
 export function SourcesTab() {
   const { isReady } = useDuckDB()
-  const isMockMode = useAppStore((s) => s.isMockMode)
   const activeSubtab = useSourcesStore((s) => s.activeSubtab)
   const activeView = useSourcesStore((s) => s.activeView)
   const syncing = useSourcesStore((s) => s.syncing)
@@ -139,10 +136,8 @@ export function SourcesTab() {
 
   // Load table data
   const loadData = useCallback(async () => {
-    if (!isMockMode && !isReady) return
+    if (!isReady) return
     setError(null)
-
-    const q = isMockMode ? mockQueries : realQueries
 
     try {
       const { start, endExclusive } = getPeriod()
@@ -150,33 +145,36 @@ export function SourcesTab() {
 
       if (activeSubtab === 'jira-issues') {
         rows = (activeView === 'raw'
-          ? await q.readSrcJiraIssues()
-          : await q.readDdsJiraIssues()) as unknown as Record<string, unknown>[]
+          ? await realQueries.readSrcJiraIssues()
+          : await realQueries.readDdsJiraIssues()) as unknown as Record<string, unknown>[]
       } else if (activeSubtab === 'jira-worklogs') {
         rows = (activeView === 'raw'
-          ? await q.readSrcJiraWorklogs(start, endExclusive)
-          : await q.readDdsJiraWorklogs(start, endExclusive)) as unknown as Record<
+          ? await realQueries.readSrcJiraWorklogs(start, endExclusive)
+          : await realQueries.readDdsJiraWorklogs(start, endExclusive)) as unknown as Record<
           string,
           unknown
         >[]
       } else if (activeSubtab === 'tempo-capacity') {
         if (tempoView === 'workload-days') {
-          rows = (await q.readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
+          rows = (await realQueries.readSrcTempoWorkloadDays()) as unknown as Record<string, unknown>[]
         } else if (tempoView === 'holidays') {
-          rows = (await q.readSrcTempoHolidays(start, endExclusive)) as unknown as Record<
+          rows = (await realQueries.readSrcTempoHolidays(start, endExclusive)) as unknown as Record<
             string,
             unknown
           >[]
         } else {
-          rows = (await q.readDdsTempoDailyCapacity(start, endExclusive)) as unknown as Record<
+          rows = (await realQueries.readDdsTempoDailyCapacity(
+            start,
+            endExclusive,
+          )) as unknown as Record<
             string,
             unknown
           >[]
         }
       } else {
         rows = (activeView === 'raw'
-          ? await q.readSrcCalendarEvents(start, endExclusive)
-          : await q.readDdsCalendarEvents(start, endExclusive)) as unknown as Record<
+          ? await realQueries.readSrcCalendarEvents(start, endExclusive)
+          : await realQueries.readDdsCalendarEvents(start, endExclusive)) as unknown as Record<
           string,
           unknown
         >[]
@@ -187,7 +185,7 @@ export function SourcesTab() {
       console.error('[Sources] Load failed:', e)
       setError((e as Error).message)
     }
-  }, [isMockMode, isReady, activeSubtab, activeView, tempoView, getPeriod])
+  }, [isReady, activeSubtab, activeView, tempoView, getPeriod])
 
   const periodMode = useSourcesStore((s) => s.periodMode)
   const selectedDate = useSourcesStore((s) => s.selectedDate)
@@ -291,7 +289,7 @@ export function SourcesTab() {
           variant="default"
           size="sm"
           onClick={handleSync}
-          disabled={isSyncing || !isSourceConnected || isMockMode}
+          disabled={isSyncing || !isSourceConnected}
         >
           <RefreshCw className={`size-4 ${isSyncing ? 'animate-spin' : ''}`} />
           Sync

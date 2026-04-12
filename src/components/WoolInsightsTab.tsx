@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ProjectsBarChart } from './insights/ProjectsBarChart'
 import { ActivityAreaChart } from './insights/ActivityAreaChart'
 import { LlamaBucket } from './insights/LlamaBucket'
-import { MONTHS } from './insights/mock-data'
+import { MONTHS } from './insights/constants'
 import { useInsightsData } from './insights/use-insights-data'
 import { useDuckDB } from '@/lib/duckdb/use-duckdb'
 

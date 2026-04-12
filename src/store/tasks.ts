@@ -8,9 +8,7 @@ import type {
   TaskUpdate,
 } from '@/lib/duckdb/queries'
 import { getMonthDateRange, toUtcIsoDateTimeRange } from '@/lib/date-range'
-import * as mockQueries from '@/lib/duckdb/mock-queries'
 import * as queries from '@/lib/duckdb/queries'
-import { useAppStore } from '@/store/app'
 
 interface TasksState {
   tasks: DdsTask[]
@@ -22,10 +20,6 @@ interface TasksState {
   updateTask: (taskId: string, fields: TaskUpdate) => Promise<void>
   updateTasks: (taskIds: string[], fields: TaskUpdate) => Promise<void>
   addTask: (input: Omit<DdsTask, 'task_id' | 'revision'>) => Promise<void>
-}
-
-function getQueries() {
-  return useAppStore.getState().isMockMode ? mockQueries : queries
 }
 
 export const useTasksStore = create<TasksState>()((set) => ({
@@ -40,12 +34,11 @@ export const useTasksStore = create<TasksState>()((set) => ({
     try {
       const monthRange = getMonthDateRange(year, month)
       const taskRange = toUtcIsoDateTimeRange(monthRange)
-      const mod = getQueries()
       const [tasks, worklogs, issues, dailyCapacity] = await Promise.all([
-        mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
-        mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
-        mod.readDdsJiraIssues(),
-        mod.readDdsTempoDailyCapacity(monthRange.start, monthRange.endExclusive),
+        queries.readDdsTasks(taskRange.start, taskRange.endExclusive),
+        queries.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
+        queries.readDdsJiraIssues(),
+        queries.readDdsTempoDailyCapacity(monthRange.start, monthRange.endExclusive),
       ])
       set({ tasks, worklogs, issues, dailyCapacity })
     } finally {
@@ -58,9 +51,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
     set((state) => ({
       tasks: state.tasks.map((t) => (t.task_id === taskId ? { ...t, ...fields } : t)),
     }))
-    // Persist to DB
-    const mod = getQueries()
-    await mod.updateTask(taskId, fields)
+    await queries.updateTask(taskId, fields)
   },
 
   updateTasks: async (taskIds, fields) => {
@@ -69,9 +60,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
     set((state) => ({
       tasks: state.tasks.map((t) => (idSet.has(t.task_id) ? { ...t, ...fields } : t)),
     }))
-    // Persist all to DB in parallel
-    const mod = getQueries()
-    await Promise.all(taskIds.map((id) => mod.updateTask(id, fields)))
+    await Promise.all(taskIds.map((id) => queries.updateTask(id, fields)))
   },
 
   addTask: async (input) => {
@@ -79,10 +68,7 @@ export const useTasksStore = create<TasksState>()((set) => ({
     // For custom_input tasks, source_id links back to the DdsCustomInput (same ID)
     const source_id = input.source === 'custom_input' ? task_id : input.source_id
     const task: DdsTask = { ...input, task_id, source_id, revision: 0 }
-    // Optimistic — add to local state immediately
     set((state) => ({ tasks: [...state.tasks, task] }))
-    // Persist (createTask handles custom input + revision + mappings + timesheet sync)
-    const mod = getQueries()
-    await mod.createTask({ ...input, task_id, source_id })
+    await queries.createTask({ ...input, task_id, source_id })
   },
 }))

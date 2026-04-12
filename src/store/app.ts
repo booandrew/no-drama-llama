@@ -14,8 +14,6 @@ export type ViewMode = 'month' | 'week' | 'day' | 'list'
 interface AppState {
   activeTab: Tab
   setActiveTab: (tab: Tab) => void
-  isMockMode: boolean
-  toggleMockMode: () => void
   hasSeenLanding: boolean
   setHasSeenLanding: () => void
   viewMode: ViewMode
@@ -29,8 +27,6 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       activeTab: 'llama-time',
       setActiveTab: (activeTab) => set({ activeTab }),
-      isMockMode: false,
-      toggleMockMode: () => set((state) => ({ isMockMode: !state.isMockMode })),
       hasSeenLanding: false,
       setHasSeenLanding: () => set({ hasSeenLanding: true }),
       viewMode: 'list',
@@ -42,7 +38,6 @@ export const useAppStore = create<AppState>()(
       name: 'app-store',
       version: 2,
       partialize: (state) => ({
-        isMockMode: state.isMockMode,
         hasSeenLanding: state.hasSeenLanding,
         selectedDate: state.selectedDate,
       }),

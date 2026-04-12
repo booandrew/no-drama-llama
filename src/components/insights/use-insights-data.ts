@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import * as queries from '@/lib/duckdb/queries'
-import * as mockQueries from '@/lib/duckdb/mock-queries'
 import { getMonthDateRange, toUtcIsoDateTimeRange } from '@/lib/date-range'
 import type { DdsJiraIssue, DdsJiraWorklog, DdsTask } from '@/lib/duckdb/queries'
-import { useAppStore } from '@/store/app'
-import { MONTHS } from './mock-data'
+import { MONTHS } from './constants'
 
 const CHART_COLORS = [
   'var(--chart-1)',
@@ -172,14 +170,11 @@ export function useInsightsData(
   selectedMonth: number,
   isDbReady: boolean,
 ): InsightsData {
-  const isMockMode = useAppStore((s) => s.isMockMode)
   const [loading, setLoading] = useState(false)
   const [monthDataMap, setMonthDataMap] = useState<Map<number, MonthData>>(new Map())
   const [issues, setIssues] = useState<DdsJiraIssue[]>([])
 
-  // Load data from DuckDB
   useEffect(() => {
-    if (isMockMode) return
     if (!isDbReady) return
 
     let cancelled = false
@@ -232,61 +227,7 @@ export function useInsightsData(
     return () => {
       cancelled = true
     }
-  }, [isMockMode, isDbReady, period, selectedYear, selectedMonth])
-
-  // Mock mode: load via mock queries
-  useEffect(() => {
-    if (!isMockMode) return
-
-    let cancelled = false
-
-    const load = async () => {
-      if (!cancelled) setLoading(true)
-      const mod = mockQueries
-      const loadedIssues = await mod.readDdsJiraIssues()
-
-      if (period === 'year') {
-        const results = await Promise.all(
-          Array.from({ length: 12 }, (_, m) => {
-            const monthRange = getMonthDateRange(selectedYear, m)
-            const taskRange = toUtcIsoDateTimeRange(monthRange)
-            return Promise.all([
-              mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
-              mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
-            ])
-          }),
-        )
-        if (cancelled) return
-        const map = new Map<number, MonthData>()
-        for (let m = 0; m < 12; m++) {
-          map.set(m, { tasks: results[m][0], worklogs: results[m][1] })
-        }
-        setMonthDataMap(map)
-        setIssues(loadedIssues)
-      } else {
-        const monthRange = getMonthDateRange(selectedYear, selectedMonth)
-        const taskRange = toUtcIsoDateTimeRange(monthRange)
-        const [tasks, worklogs] = await Promise.all([
-          mod.readDdsTasks(taskRange.start, taskRange.endExclusive),
-          mod.readDdsJiraWorklogs(monthRange.start, monthRange.endExclusive),
-        ])
-        if (cancelled) return
-        const map = new Map<number, MonthData>()
-        map.set(selectedMonth, { tasks, worklogs })
-        setMonthDataMap(map)
-        setIssues(loadedIssues)
-      }
-      setLoading(false)
-    }
-
-    load().catch(() => {
-      if (!cancelled) setLoading(false)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isMockMode, period, selectedYear, selectedMonth])
+  }, [isDbReady, period, selectedYear, selectedMonth])
 
   // Aggregate
   const result = useMemo(() => {
