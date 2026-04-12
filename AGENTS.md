@@ -40,7 +40,7 @@ pnpm preview:cf     # build + preview with Cloudflare Pages (wrangler)
 
 ```
 .
-├── functions/              # Cloudflare Pages edge functions (Jira/Tempo API proxies, OAuth)
+├── functions/              # Cloudflare Pages edge functions (Google Calendar/Jira/Tempo API proxies, OAuth)
 ├── public/                 # static assets (favicons, manifest)
 ├── src/
 │   ├── assets/             # SVG illustrations

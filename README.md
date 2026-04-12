@@ -20,24 +20,46 @@ pnpm install
 pnpm dev
 ```
 
-The dev server starts at `http://localhost:5173`.
+`pnpm dev` runs the app through Cloudflare Pages via Wrangler. Browse to `http://localhost:8788`.
+
+If you only want the Vite dev server, run:
+
+```bash
+pnpm dev:vite
+```
+
+That starts Vite on `http://localhost:5173`.
 
 ### Environment variables
 
 Create a `.env.local`:
 
 ```env
+# Optional org label shown in the UI
+VITE_ORG_NAME=<your-org-name>
+
+# Org-level Google Calendar OAuth
 VITE_GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
+
+# Org-level Jira OAuth
 VITE_JIRA_CLIENT_ID=<your-jira-oauth-client-id>
+JIRA_CLIENT_SECRET=<your-jira-oauth-client-secret>
 ```
 
-Both are optional — users can enter their own OAuth client IDs in the UI if org-level ones aren't set.
+Notes:
+
+- `VITE_GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` enable org-level Google Calendar OAuth.
+- `VITE_JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` enable org-level Jira OAuth.
+- Google Calendar also supports a personal OAuth app flow in the UI, where users provide their own client ID and client secret.
+- Jira does not support a personal OAuth client flow in the UI. The fallback there is Jira site URL + email + API token.
 
 ### Scripts
 
 | Command              | Description                              |
 | -------------------- | ---------------------------------------- |
-| `pnpm dev`           | Vite dev server with HMR                 |
+| `pnpm dev`           | Wrangler Pages dev + Vite                |
+| `pnpm dev:vite`      | Vite dev server only                     |
 | `pnpm build`         | TypeScript type-check + production build |
 | `pnpm lint`          | ESLint                                   |
 | `pnpm format`        | Prettier (`src/**/*.{ts,tsx,css}`)        |
