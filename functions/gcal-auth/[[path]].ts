@@ -1,4 +1,4 @@
-import { getCookie, setCookie } from '../_shared/cookies'
+import { clearCookie, setCookie } from '../_shared/cookies'
 
 interface Env {
   GOOGLE_CLIENT_SECRET?: string
@@ -27,9 +27,8 @@ async function handleOAuthToken(request: Request, env: Env, url: URL): Promise<R
       refresh_token?: string
     }>()
 
-    // Resolve secret: body (first connect personal) > cookie (re-connect personal) > env (org)
-    const clientSecret =
-      body.client_secret || getCookie(request, 'gcal_client_secret') || env.GOOGLE_CLIENT_SECRET
+    // Personal flow sends its secret on each auth code exchange; org flow uses the server secret.
+    const clientSecret = body.client_secret || env.GOOGLE_CLIENT_SECRET
     if (!clientSecret) {
       return new Response('Server misconfigured: missing GOOGLE_CLIENT_SECRET', { status: 500 })
     }
@@ -91,20 +90,13 @@ async function handleOAuthToken(request: Request, env: Env, url: URL): Promise<R
       )
     }
 
-    // Store client_secret for personal flow (server needs it for refresh)
-    if (body.client_secret) {
-      headers.append(
-        'Set-Cookie',
-        setCookie('gcal_client_secret', body.client_secret, cookieOpts),
-      )
-    }
-
     // Determine auth method
     const authMethod = body.client_secret ? 'personal' : 'org'
     headers.append(
       'Set-Cookie',
       setCookie('gcal_auth_method', authMethod, cookieOpts),
     )
+    headers.append('Set-Cookie', clearCookie('gcal_client_secret'))
 
     return new Response(
       JSON.stringify({ connected: true, authMethod }),

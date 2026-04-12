@@ -155,8 +155,10 @@ async function doRefresh(request: Request, env: Env): Promise<RefreshResult | nu
   const clientId = getCookie(request, 'gcal_client_id')
   if (!refreshToken || !clientId) return null
 
-  // Personal flow stores client_secret in cookie; org flow uses env
-  const clientSecret = getCookie(request, 'gcal_client_secret') || env.GOOGLE_CLIENT_SECRET
+  const authMethod = getCookie(request, 'gcal_auth_method')
+  if (authMethod === 'personal') return null
+
+  const clientSecret = env.GOOGLE_CLIENT_SECRET
   if (!clientSecret) return null
 
   try {

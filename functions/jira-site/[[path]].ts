@@ -1,4 +1,5 @@
 import { getCookie } from '../_shared/cookies'
+import { jiraSiteHostError, normalizeJiraSiteHost } from '../_shared/jira-site'
 
 export const onRequest: PagesFunction = async (context) => {
   const { request } = context
@@ -16,13 +17,18 @@ export const onRequest: PagesFunction = async (context) => {
     return new Response('Missing Jira credentials in cookies', { status: 401 })
   }
 
+  const normalizedSiteUrl = normalizeJiraSiteHost(siteUrl)
+  if (!normalizedSiteUrl) {
+    return new Response(jiraSiteHostError(), { status: 400 })
+  }
+
   const url = new URL(request.url)
   const targetPath = url.pathname.replace(/^\/jira-site/, '')
-  const targetUrl = new URL(targetPath + url.search, `https://${siteUrl}`)
+  const targetUrl = new URL(targetPath + url.search, `https://${normalizedSiteUrl}`)
 
   const basicAuth = btoa(`${email}:${apiToken}`)
   const headers = new Headers(request.headers)
-  headers.set('Host', siteUrl)
+  headers.set('Host', normalizedSiteUrl)
   headers.set('Authorization', `Basic ${basicAuth}`)
   headers.delete('X-Jira-Host')
   headers.delete('Cookie')

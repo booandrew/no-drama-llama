@@ -1,3 +1,5 @@
+import { jiraSiteHostError, normalizeJiraSiteHost } from './jira-site'
+
 export type JiraValidationCode =
   | 'ok'
   | 'missing_scope'
@@ -71,11 +73,20 @@ export async function validateJiraTokenAccess(
   siteUrl: string,
   basicAuth: string,
 ): Promise<JiraValidationResult> {
+  const normalizedSiteUrl = normalizeJiraSiteHost(siteUrl)
+  if (!normalizedSiteUrl) {
+    return {
+      ok: false,
+      code: 'invalid',
+      message: jiraSiteHostError(),
+    }
+  }
+
   const headers = { Authorization: `Basic ${basicAuth}`, Accept: 'application/json' }
 
   const [meRes, searchRes] = await Promise.all([
-    fetch(`https://${siteUrl}/rest/api/3/myself`, { headers }),
-    fetch(`https://${siteUrl}/rest/api/3/search/jql?${SEARCH_PARAMS}`, { headers }),
+    fetch(`https://${normalizedSiteUrl}/rest/api/3/myself`, { headers }),
+    fetch(`https://${normalizedSiteUrl}/rest/api/3/search/jql?${SEARCH_PARAMS}`, { headers }),
   ])
 
   if (meRes.status === 401 || searchRes.status === 401) {

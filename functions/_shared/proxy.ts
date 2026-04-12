@@ -7,6 +7,7 @@ export function createProxy(targetOrigin: string, stripPrefix: string) {
 
     const headers = new Headers(request.headers)
     headers.set('Host', targetUrl.hostname)
+    headers.delete('Cookie')
     headers.delete('X-Jira-Host')
 
     const proxyReq = new Request(targetUrl.toString(), {

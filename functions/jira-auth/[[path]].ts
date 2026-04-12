@@ -1,4 +1,5 @@
 import { setCookie, clearCookie } from '../_shared/cookies'
+import { jiraSiteHostError, normalizeJiraSiteHost } from '../_shared/jira-site'
 import {
   validateJiraOAuthAccess,
   validateJiraTokenAccess,
@@ -130,9 +131,17 @@ async function handleConnectToken(request: Request, url: URL): Promise<Response>
       apiToken: string
     }>()
 
+    const normalizedSiteUrl = normalizeJiraSiteHost(siteUrl)
+    if (!normalizedSiteUrl) {
+      return new Response(
+        JSON.stringify({ error: jiraSiteHostError(), code: 'invalid' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
     // Validate credentials by calling Jira
     const basicAuth = btoa(`${email}:${apiToken}`)
-    const meRes = await fetch(`https://${siteUrl}/rest/api/3/myself`, {
+    const meRes = await fetch(`https://${normalizedSiteUrl}/rest/api/3/myself`, {
       headers: { Authorization: `Basic ${basicAuth}`, Accept: 'application/json' },
     })
     if (!meRes.ok) {
@@ -144,7 +153,7 @@ async function handleConnectToken(request: Request, url: URL): Promise<Response>
     }
     const me = await meRes.json<{ accountId: string }>()
 
-    const validation = await validateJiraTokenAccess(siteUrl, basicAuth)
+    const validation = await validateJiraTokenAccess(normalizedSiteUrl, basicAuth)
     if (!validation.ok) {
       return new Response(
         JSON.stringify({ error: validation.message, code: validation.code }),
@@ -160,7 +169,7 @@ async function handleConnectToken(request: Request, url: URL): Promise<Response>
       setCookie('jira_auth_method', 'token', cookieOpts),
       setCookie('jira_email', email, cookieOpts),
       setCookie('jira_api_token', apiToken, cookieOpts),
-      setCookie('jira_site_url', siteUrl, cookieOpts),
+      setCookie('jira_site_url', normalizedSiteUrl, cookieOpts),
       setCookie('jira_account_id', me.accountId, cookieOpts),
     ]
 

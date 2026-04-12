@@ -139,15 +139,6 @@ function readPersonalClientId(): string {
   }
 }
 
-function readPersonalClientSecret(): string {
-  try {
-    const raw = localStorage.getItem('gcal-personal-secret')
-    return raw ?? ''
-  } catch {
-    return ''
-  }
-}
-
 function GCalTab() {
   const status = useCalendarStore((s) => s.status)
   const authMethod = useCalendarStore((s) => s.authMethod)
@@ -162,6 +153,14 @@ function GCalTab() {
   const { connect } = useGoogleCalendarConnect()
   const hasOrgMethod = !!GCAL_ORG_CLIENT_ID
 
+  useEffect(() => {
+    try {
+      localStorage.removeItem('gcal-personal-secret')
+    } catch {
+      // best-effort cleanup of legacy storage
+    }
+  }, [])
+
   function initAndConnect(
     clientId: string,
     method: CalendarAuthMethod,
@@ -171,9 +170,6 @@ function GCalTab() {
     if (!gisReady) return
     if (method === 'personal') {
       setPersonalClientId(clientId)
-      if (clientSecret) {
-        localStorage.setItem('gcal-personal-secret', clientSecret)
-      }
     }
     connect(clientId, method, clientSecret, forceConsent)
   }
@@ -203,21 +199,50 @@ function GCalTab() {
         </a>
         {broken && (
           <p className="text-sm text-destructive">
-            Access token expired. Re-connect to continue syncing.
+            {authMethod === 'personal'
+              ? 'Personal app credentials are not stored. Re-enter the client secret to reconnect.'
+              : 'Access token expired. Re-connect to continue syncing.'}
           </p>
         )}
+        {broken && authMethod === 'personal' && (
+          <div className="flex flex-col gap-2">
+            <Input
+              placeholder="Client ID"
+              value={clientIdInput}
+              onChange={(e) => setClientIdInput(e.target.value)}
+            />
+            <Input
+              type="password"
+              placeholder="Client Secret"
+              value={clientSecretInput}
+              onChange={(e) => setClientSecretInput(e.target.value)}
+            />
+          </div>
+        )}
         <div className="flex gap-2">
-          {broken && (
+          {broken && authMethod === 'org' && (
             <Button
               variant="default"
               size="sm"
               className="flex-1"
               disabled={!gisReady}
               onClick={() => {
-                const clientId = authMethod === 'org' ? GCAL_ORG_CLIENT_ID : readPersonalClientId()
-                const secret = authMethod === 'personal' ? readPersonalClientSecret() : undefined
-                if (clientId) initAndConnect(clientId, authMethod ?? 'org', secret, true)
+                const clientId = GCAL_ORG_CLIENT_ID
+                if (clientId) initAndConnect(clientId, 'org', undefined, true)
               }}
+            >
+              Re-connect
+            </Button>
+          )}
+          {broken && authMethod === 'personal' && (
+            <Button
+              variant="default"
+              size="sm"
+              className="flex-1"
+              disabled={!gisReady || !clientIdInput.trim() || !clientSecretInput.trim()}
+              onClick={() =>
+                initAndConnect(clientIdInput.trim(), 'personal', clientSecretInput.trim(), true)
+              }
             >
               Re-connect
             </Button>
@@ -290,6 +315,10 @@ function GCalTab() {
           value={clientSecretInput}
           onChange={(e) => setClientSecretInput(e.target.value)}
         />
+        <p className="text-muted-foreground text-xs">
+          The client secret is used only for this connection attempt and is not stored in the
+          browser.
+        </p>
         <Button
           onClick={() =>
             initAndConnect(clientIdInput.trim(), 'personal', clientSecretInput.trim(), true)

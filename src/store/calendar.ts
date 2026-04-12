@@ -52,6 +52,18 @@ function readPersistedSelectedDate(): string | null {
   }
 }
 
+function clearLegacyPersonalSecret(): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.removeItem('gcal-personal-secret')
+  } catch {
+    // best-effort cleanup of legacy storage
+  }
+}
+
+clearLegacyPersonalSecret()
+
 interface CalendarState {
   status: CalendarStatus
   authMethod: CalendarAuthMethod | null
